@@ -13,13 +13,13 @@ jobs:
     name: Linux bundles
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10.34.5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -42,9 +42,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build bundles
-        # AppImage bundling must happen on a real distro with the system webkit
-        # present: Tauri's bundler resolves libraries through distro pkg-config,
-        # which the Nix store does not provide.
         run: pnpm tauri build --bundles appimage deb rpm
 
       - uses: actions/upload-artifact@v4
@@ -60,13 +57,13 @@ jobs:
     name: Windows installers
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10.34.5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -91,7 +88,7 @@ jobs:
     name: Nix package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: DeterminateSystems/nix-installer-action@v4
 

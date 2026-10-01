@@ -167,7 +167,7 @@
             rustc
             cargo
             nodejs_22
-            pnpm
+            pnpm_10
           ];
           shellHook = ''
             export RUST_BACKTRACE=1
