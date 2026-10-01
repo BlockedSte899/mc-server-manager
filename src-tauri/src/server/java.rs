@@ -220,7 +220,7 @@ fn windows_registry_candidates(list: &mut Vec<(PathBuf, String)>) {
     ];
     for root in roots {
         if let Ok(key) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(root, KEY_READ) {
-            for (name, _) in key.enum_keys().flatten() {
+            for name in key.enum_keys().flatten() {
                 if let Ok(sub) = key.open_subkey_with_flags(name, KEY_READ) {
                     if let Ok(home) = sub.get_value::<String, _>("JavaHome") {
                         list.push((

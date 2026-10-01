@@ -32,9 +32,9 @@ Add it as an input — in your `flake.nix`:
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     mc-server-manager = {
-      url = "github:YOUR_USERNAME/mc-server-manager";
+      url = "github:BlockedSte899/mc-server-manager";
       # pin to a release tag once you have one:
-      # inputs.mc-server-manager.url = "github:YOUR_USERNAME/mc-server-manager/v0.1.0";
+      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v0.1.0";
     };
   };
 
@@ -68,7 +68,7 @@ mc-server-manager --help   # CLI options
 To try it without adding it to your configuration:
 
 ```bash
-nix run github:YOUR_USERNAME/mc-server-manager
+nix run github:BlockedSte899/mc-server-manager
 ```
 
 #### With Home Manager
@@ -81,15 +81,15 @@ home.packages = [ inputs.mc-server-manager.packages.${pkgs.system}.default ];
 
 ```bash
 # run without installing
-nix run github:YOUR_USERNAME/mc-server-manager
+nix run github:BlockedSte899/mc-server-manager
 
 # or build the store path
-nix build github:YOUR_USERNAME/mc-server-manager
+nix build github:BlockedSte899/mc-server-manager
 ./result/bin/mc-server-manager
 ```
 
 The package is Linux-only. Windows and macOS users should take the installers from
-[Releases](https://github.com/YOUR_USERNAME/mc-server-manager/releases).
+[Releases](https://github.com/BlockedSte899/mc-server-manager/releases).
 
 #### What the flake packages
 
@@ -106,7 +106,7 @@ fixed-output derivation, so the build is fully sandboxed and reproducible.
 
 ### AppImage
 
-Grab the `.AppImage` from [Releases](https://github.com/YOUR_USERNAME/mc-server-manager/releases):
+Grab the `.AppImage` from [Releases](https://github.com/BlockedSte899/mc-server-manager/releases):
 
 ```bash
 chmod +x MC_Server_Manager_0.1.0_amd64.AppImage
@@ -134,7 +134,7 @@ sudo dnf install ./mc-server-manager-0.1.0-1.x86_64.rpm
 ### Windows
 
 Download the NSIS installer (`MC Server Manager_0.1.0_x64-setup.exe`) from
-[Releases](https://github.com/YOUR_USERNAME/mc-server-manager/releases). It installs per
+[Releases](https://github.com/BlockedSte899/mc-server-manager/releases). It installs per
 user, needs no separate runtime, and ships English and Russian. An MSI is provided too.
 
 Windows users need a Java runtime to launch servers — either install Temurin/OpenJDK

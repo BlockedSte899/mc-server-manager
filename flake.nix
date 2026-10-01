@@ -135,7 +135,7 @@
               browse worlds/mods/logs and watch the console — with a tray mode
               for background operation.
             '';
-            homepage = "https://github.com/YOUR_USERNAME/mc-server-manager";
+            homepage = "https://github.com/BlockedSte899/mc-server-manager";
             license = lib.licenses.mit;
             mainProgram = "mc-server-manager";
             platforms = lib.platforms.linux;

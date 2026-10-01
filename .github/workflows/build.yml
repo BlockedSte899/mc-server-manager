@@ -28,11 +28,12 @@ jobs:
       - name: Install system dependencies (Tauri v2)
         run: |
           sudo apt-get update
+          # libayatana-appindicator3-dev Conflicts with libappindicator3-dev, so
+          # only the ayatana fork is installed — it provides the same tray API.
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
             libayatana-appindicator3-dev \
+            librsvg2-dev \
             libssl-dev \
             patchelf \
             rpm
@@ -72,6 +73,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - run: pnpm install --frozen-lockfile
+
+      # Fails fast on Windows-only Rust errors (cfg(windows) code is invisible
+      # to the Linux job), instead of waiting for the full frontend + bundle.
+      - name: Check Rust sources
+        run: cargo check --workspace --locked
 
       - name: Build installers (NSIS + MSI)
         run: pnpm tauri build
