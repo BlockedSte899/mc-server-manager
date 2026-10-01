@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #ecfdf5;
+  --color-brand-500: #27c985;
+  --color-brand-600: #17a873;
+  --color-brand-700: #158a61;
+  --color-surface-0: #0b1220;
+  --color-surface-1: #111a2e;
+  --color-surface-2: #182338;
+  --color-surface-3: #22304a;
+  --color-edge: #2a3a58;
+  --color-fg: #e6edf7;
+  --color-fg-dim: #8fa3bf;
+  --color-accent: #38bdf8;
+  --color-magenta: #c084fc;
+}
+
+html {
+  color-scheme: dark;
+}
+
+/* Midnight theme — deeper indigo-blue surfaces, slightly higher contrast */
+html[data-theme="midnight"] {
+  --color-surface-0: #070b18;
+  --color-surface-1: #0d1430;
+  --color-surface-2: #16204a;
+  --color-surface-3: #22305f;
+  --color-edge: #33437a;
+  --color-fg: #eef2ff;
+  --color-fg-dim: #93a3cf;
+  --color-accent: #60a5fa;
+  --color-magenta: #c084fc;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--color-surface-0);
+  color: var(--color-fg);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* native widgets (select popups, scrollbars, inputs) must match the dark theme */
+select,
+select option {
+  background-color: var(--color-surface-2);
+  color: var(--color-fg);
+}
+select option:checked {
+  background-color: var(--color-brand-600);
+  color: #fff;
+}
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-fg-dim) 50%),
+    linear-gradient(135deg, var(--color-fg-dim) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+input[type="number"],
+input[type="text"],
+input[type="password"] {
+  color-scheme: dark;
+}
+
+/* slim scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2f425f transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2f425f;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Inner dashboard panes: reserve a gutter so the slim scrollbar never
+   overlaps the content it scrolls (WebKit draws it on top by default). */
+.scroll-gutter {
+  scrollbar-gutter: stable;
+}
+.scroll-gutter::-webkit-scrollbar {
+  width: 10px;
+}
+.scroll-gutter::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  border-right: 2px solid transparent;
+}
+
+/* Minecraft "obfuscated" text preview (&k): flickers the glyphs */
+@keyframes mcobfuscate {
+  0% {
+    opacity: 1;
+  }
+  16% {
+    opacity: 0.35;
+  }
+  32% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.15;
+  }
+  64% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.text-obfuscate {
+  animation: mcobfuscate 0.9s steps(4) infinite;
+  text-shadow: 0 0 1px currentColor;
+}
+
+/* Log/console syntax highlighting (consoleLines.ts) */
+.hl-ts {
+  color: #64748b;
+}
+.hl-info {
+  color: #34d399;
+}
+.hl-warn {
+  color: #fbbf24;
+}
+.hl-error {
+  color: #f87171;
+}
+.hl-debug {
+  color: #22d3ee;
+}
+.hl-coord {
+  color: #818cf8;
+}
+/* Server dashboards: block-level panes scroll instead of the window */
+html.dash-scroll-lock {
+  scrollbar-width: none;
+}
+html.dash-scroll-lock,
+html.dash-scroll-lock body {
+  overflow: hidden;
+}

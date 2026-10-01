@@ -1,0 +1,133 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Linux bundles
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install system dependencies (Tauri v2)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libayatana-appindicator3-dev \
+            libssl-dev \
+            patchelf \
+            rpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build bundles
+        # AppImage bundling must happen on a real distro with the system webkit
+        # present: Tauri's bundler resolves libraries through distro pkg-config,
+        # which the Nix store does not provide.
+        run: pnpm tauri build --bundles appimage deb rpm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-linux
+          path: |
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/deb/*.deb
+            target/release/bundle/rpm/*.rpm
+          if-no-files-found: error
+
+  windows:
+    name: Windows installers
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build installers (NSIS + MSI)
+        run: pnpm tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-windows
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+  nix:
+    name: Nix package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v4
+
+      - uses: cachix/install-nix-action@v27
+
+      - name: Build the flake package
+        run: nix build .#default
+
+      - name: Run flake checks
+        run: nix flake check --no-build
+
+  publish:
+    name: Publish GitHub Release
+    needs: [linux, windows, nix]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            ## NixOS
+
+            ```nix
+            inputs.mc-server-manager.url = "github:${{ github.repository }}/${{ github.ref_name }}";
+            ```
+
+            Then add `inputs.mc-server-manager.packages.x86_64-linux.default` to
+            `environment.systemPackages`, or run it directly:
+
+            ```bash
+            nix run github:${{ github.repository }}/${{ github.ref_name }}
+            ```
