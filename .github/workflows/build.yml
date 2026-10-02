@@ -117,14 +117,16 @@ jobs:
   # account: create one, run `cachix use <name>`, and add the resulting
   # token as the CACHIX_AUTH_TOKEN repository secret. Skipped when unset.
   #
-  # Note: `secrets` is NOT available inside a step-level `if` (that was the
-  # invalid `if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}`), so the push lives in
-  # its own job where a job-level `if` CAN read secrets.
+  # Note: `secrets` is NOT usable in `if:` (job-level or step-level), so the
+  # token is injected through a job-level `env` and the step checks the `env`
+  # context instead — an unset secret becomes an empty string and the step is
+  # skipped.
   cachix:
     name: Push to Cachix
     needs: nix
-    if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
@@ -142,7 +144,9 @@ jobs:
       - name: Build the flake package
         run: nix build .#default
 
-      - uses: cachix/cachix-action@v16
+      - name: Push to Cachix
+        if: ${{ env.CACHIX_AUTH_TOKEN != '' }}
+        uses: cachix/cachix-action@v16
         with:
           name: mc-server-manager
           skipPush: false
