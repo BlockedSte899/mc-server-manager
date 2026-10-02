@@ -106,23 +106,47 @@ jobs:
           cache-key: mcsm-${{ github.ref_name }}
           never-skip-cache-verification: true
 
-      # Public binary cache, so `nix build` on a user's machine downloads the
-      # package instead of compiling it for ~10 minutes. Requires a free Cachix
-      # account: create one, run `cachix use <name>`, and add the resulting
-      # token as the CACHIX_AUTH_TOKEN repository secret. Skipped when unset.
-      - name: Push to Cachix
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
-        uses: cachix/cachix-action@v16
-        with:
-          name: mc-server-manager
-          skipPush: false
-          extraPushFlags: "--verbose"
-
       - name: Build the flake package
         run: nix build .#default
 
       - name: Run flake checks
         run: nix flake check --no-build
+
+  # Public binary cache, so `nix build` on a user's machine downloads the
+  # package instead of compiling it for ~10 minutes. Requires a free Cachix
+  # account: create one, run `cachix use <name>`, and add the resulting
+  # token as the CACHIX_AUTH_TOKEN repository secret. Skipped when unset.
+  #
+  # Note: `secrets` is NOT available inside a step-level `if` (that was the
+  # invalid `if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}`), so the push lives in
+  # its own job where a job-level `if` CAN read secrets.
+  cachix:
+    name: Push to Cachix
+    needs: nix
+    if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DeterminateSystems/nix-installer-action@v4
+
+      - uses: cachix/install-nix-action@v27
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          cache-key: mcsm-${{ github.ref_name }}
+          never-skip-cache-verification: true
+
+      # Rebuild in this fresh runner so the store holds the derivations to push
+      # (jobs don't share a store, so the `nix` job's build is not visible here).
+      - name: Build the flake package
+        run: nix build .#default
+
+      - uses: cachix/cachix-action@v16
+        with:
+          name: mc-server-manager
+          skipPush: false
+          extraPushFlags: "--verbose"
 
   publish:
     name: Publish GitHub Release
