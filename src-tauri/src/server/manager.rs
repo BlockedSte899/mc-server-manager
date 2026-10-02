@@ -292,6 +292,7 @@ pub async fn install_forge(
     }
     emit_stage(app, "install", "installing-loader").await;
     let mut cmd = tokio::process::Command::new(java);
+    crate::utils::console::hide_console(&mut cmd);
     cmd.arg("-jar")
         .arg(&installer)
         .arg("--installServer")

@@ -36,7 +36,7 @@
           libxcb
         ];
 
-        version = "0.1.0";
+        version = "1.0.4";
 
         # GSettings schemas that GTK/WebKitGTK need at runtime. nixpkgs nests
         # each package's schemas under share/gsettings-schemas/<name>/…, which
@@ -58,7 +58,13 @@
         # NOT done here: the AppImage bundler downloads linuxdeploy at build
         # time, which the Nix sandbox forbids. Release bundles are produced
         # outside the sandbox by `pnpm tauri build` (see README).
-        mcsm = pkgs.rustPlatform.buildRustPackage {
+        #
+        # `java` is a parameter rather than a fixed dependency: a full JDK adds
+        # ~770 MiB to the runtime closure, which is half of the download. The app
+        # detects Java itself (settings screen, PATH, JAVA_HOME, Nix store), so
+        # the default package ships without one — anyone who wants it bundled
+        # uses the `withJava` variant below.
+        mcsmFor = java: pkgs.rustPlatform.buildRustPackage {
           pname = "mc-server-manager";
           inherit version;
 
@@ -123,8 +129,10 @@
             wrapProgram $out/bin/mc-server-manager \
               --prefix LD_LIBRARY_PATH : "${pkgs.libayatana-appindicator}/lib" \
               --set GSETTINGS_SCHEMA_DIR "${gsettingsBundle}/share/glib-2.0/schemas/gschemas.compiled" \
-              --prefix PATH : "${pkgs.openjdk17}/bin" \
-              --set JAVA_HOME "${pkgs.openjdk17}"
+              ${lib.optionalString (java != null) ''
+                --prefix PATH : "${java}/bin" \
+                --set JAVA_HOME "${java}"
+              ''}
           '';
 
           meta = {
@@ -141,11 +149,18 @@
             platforms = lib.platforms.linux;
           };
         };
+
+        # Default: no bundled JDK, ~1/3 smaller download and closure.
+        mcsm = mcsmFor null;
+
+        # Opt-in: ships an OpenJDK 17 and puts it on PATH for the app.
+        mcsmWithJava = mcsmFor pkgs.openjdk17;
       in
       {
         packages = {
           default = mcsm;
           mc-server-manager = mcsm;
+          withJava = mcsmWithJava;
         };
 
         apps.default = {

@@ -1,3 +1,4 @@
+pub mod console;
 pub mod download;
 pub mod mcver;
 pub mod paths;

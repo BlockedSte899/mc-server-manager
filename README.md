@@ -34,7 +34,7 @@ Add it as an input — in your `flake.nix`:
     mc-server-manager = {
       url = "github:BlockedSte899/mc-server-manager";
       # pin to a release tag once you have one:
-      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v0.1.0";
+      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v1.0.4";
     };
   };
 
@@ -98,19 +98,53 @@ The Nix package wraps the binary so it works on a clean NixOS install:
 - `GSETTINGS_SCHEMA_DIR` points at a merged, compiled bundle of GTK3 + GLib +
   desktop GSettings schemas, which GTK file dialogs require
 - `LD_LIBRARY_PATH` includes `libayatana-appindicator`, which the tray icon `dlopen()`s
-- `JAVA_HOME` and `PATH` include OpenJDK 17, so servers can be launched out of the box
-  (override with the app's own Java settings)
 
 Building the Nix package needs no network access; pnpm dependencies are fetched by a
 fixed-output derivation, so the build is fully sandboxed and reproducible.
+
+#### Java is not bundled
+
+The default package deliberately ships **without** a JDK: a full OpenJDK adds roughly
+770 MiB to the runtime closure, which is about a third of the total download. The app
+finds Java itself — check Settings → Java, which scans `JAVA_HOME`, `PATH`,
+`/usr/lib/jvm`, the Nix store and Prism Launcher.
+
+If you would rather have it bundled (and are happy to pay the download), use the
+`withJava` variant, which puts OpenJDK 17 on `PATH`:
+
+```nix
+environment.systemPackages = [ inputs.mc-server-manager.packages.${pkgs.system}.withJava ];
+```
+
+#### First build vs. binary cache
+
+Until a cache is configured, `nix build` compiles the whole Rust/Tauri app from
+source, which takes roughly ten minutes on a normal machine. To download a ready
+binary instead, add the project's binary cache as a substituter:
+
+```nix
+# /etc/nix/nix.conf  (or nix.settings.substituters in NixOS)
+substituters = https://cache.nixos.org https://mc-server-manager.cachix.org
+trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= mc-server-manager.cachix.org-1:<key from the cache>
+```
+
+then verify and build:
+
+```bash
+nix store verify --check-contents --repair   # only if needed
+nix build github:BlockedSte899/mc-server-manager
+```
+
+CI publishes every build to that cache, so once a release has been through CI the
+package is fetched instead of compiled.
 
 ### AppImage
 
 Grab the `.AppImage` from [Releases](https://github.com/BlockedSte899/mc-server-manager/releases):
 
 ```bash
-chmod +x MC_Server_Manager_0.1.0_amd64.AppImage
-./MC_Server_Manager_0.1.0_amd64.AppImage
+chmod +x MC_Server_Manager_1.0.4_amd64.AppImage
+./MC_Server_Manager_1.0.4_amd64.AppImage
 ```
 
 The AppImage bundles its own libraries, so it runs on Ubuntu, Fedora, Arch and friends
@@ -118,22 +152,22 @@ without installing dependencies. Some distributions (Fedora, some Arch setups) r
 
 ```bash
 sudo apt install libfuse2      # Debian / Ubuntu
-./MC_Server_Manager_0.1.0_amd64.AppImage --appimage-extract-and-run   # no FUSE
+./MC_Server_Manager_1.0.4_amd64.AppImage --appimage-extract-and-run   # no FUSE
 ```
 
 ### .deb / .rpm
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./mc-server-manager_0.1.0_amd64.deb
+sudo apt install ./mc-server-manager_1.0.4_amd64.deb
 
 # Fedora / openSUSE
-sudo dnf install ./mc-server-manager-0.1.0-1.x86_64.rpm
+sudo dnf install ./mc-server-manager-1.0.4-1.x86_64.rpm
 ```
 
 ### Windows
 
-Download the NSIS installer (`MC Server Manager_0.1.0_x64-setup.exe`) from
+Download the NSIS installer (`MC Server Manager_1.0.4_x64-setup.exe`) from
 [Releases](https://github.com/BlockedSte899/mc-server-manager/releases). It installs per
 user, needs no separate runtime, and ships English and Russian. An MSI is provided too.
 
@@ -175,8 +209,8 @@ Release binaries are produced by [`.github/workflows/build.yml`](.github/workflo
 on tag pushes and are published to GitHub Releases automatically:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.4
+git push origin v1.0.4
 ```
 
 ## License

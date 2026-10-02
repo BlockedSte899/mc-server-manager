@@ -270,6 +270,7 @@ fn spawn_metrics(
 /// Builds the java command-line for a server.
 fn java_command(java: &Path, meta: &ServerMeta, server_dir: &Path) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new(java);
+    crate::utils::console::hide_console(&mut cmd);
     cmd.arg(format!("-Xms{}M", meta.min_ram))
         .arg(format!("-Xmx{}M", meta.max_ram));
     cmd.args(crate::server::jvm::extra_args(meta));

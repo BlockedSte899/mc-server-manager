@@ -52,6 +52,7 @@ pub async fn install_fabric(
     loader: &str,
 ) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new(java);
+    crate::utils::console::hide_console(&mut cmd);
     cmd.arg("-jar")
         .arg(installer)
         .arg("server")
@@ -83,6 +84,7 @@ pub async fn install_quilt(
     loader: &str,
 ) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new(java);
+    crate::utils::console::hide_console(&mut cmd);
     cmd.arg("-jar")
         .arg(installer)
         .arg("install")

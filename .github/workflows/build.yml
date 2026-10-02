@@ -100,6 +100,24 @@ jobs:
 
       - uses: cachix/install-nix-action@v27
 
+      # Speeds up this job only — the GitHub Actions cache is not public.
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          cache-key: mcsm-${{ github.ref_name }}
+          never-skip-cache-verification: true
+
+      # Public binary cache, so `nix build` on a user's machine downloads the
+      # package instead of compiling it for ~10 minutes. Requires a free Cachix
+      # account: create one, run `cachix use <name>`, and add the resulting
+      # token as the CACHIX_AUTH_TOKEN repository secret. Skipped when unset.
+      - name: Push to Cachix
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        uses: cachix/cachix-action@v16
+        with:
+          name: mc-server-manager
+          skipPush: false
+          extraPushFlags: "--verbose"
+
       - name: Build the flake package
         run: nix build .#default
 

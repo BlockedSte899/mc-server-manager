@@ -181,7 +181,7 @@ export const velocityApi = {
 
 export const miscApi = {
   openUrl: (url: string) => call<void>("open_url", { url }),
-  uiMetrics: () => call<{ scale: number; physical: { width: number; height: number }; inner: { width: number; height: number } }>("ui_metrics"),
+  uiMetrics: () => call<{ scale: number; physical: { width: number; height: number }; logical: { width: number; height: number } }>("ui_metrics"),
   uiLog: (msg: string) => call<void>("ui_log", { msg }),
 };
 

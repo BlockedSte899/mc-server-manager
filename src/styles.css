@@ -18,6 +18,14 @@
 
 html {
   color-scheme: dark;
+  /* Pin the root font size. WebKitGTK seeds it from the GTK default font
+     ("Sans 10" ≈ 13.33px) instead of the CSS initial 16px, and Tailwind sizes
+     the whole UI in rem — so every element, gap and icon came out ~17% smaller
+     than the design intends (most visible on NixOS, where the app runs from a
+     Nix store path with its own GTK settings). 16px matches what the browser
+     default should be, making rem deterministic across platforms. Adjust with
+     the in-app UI-scale setting on top of this. */
+  font-size: 16px;
 }
 
 /* Midnight theme — deeper indigo-blue surfaces, slightly higher contrast */

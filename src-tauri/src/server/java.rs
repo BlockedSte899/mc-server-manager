@@ -238,7 +238,7 @@ async fn probe_version(path: &Path) -> Option<(u32, String)> {
     if !path.exists() {
         return None;
     }
-    let out = tokio::process::Command::new(path)
+    let out = crate::utils::console::hide_console(&mut tokio::process::Command::new(path))
         .arg("-version")
         .output()
         .await

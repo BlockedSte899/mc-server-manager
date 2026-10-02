@@ -12,7 +12,6 @@
 
   let zoomReady = $state(false);
   let zoomMode: "webview" | "transform" = $state("webview");
-  let baseCorrection = $state(1);
 
   $effect(() => {
     if (!zoomReady) return;
@@ -28,44 +27,77 @@
     void applyZoom();
   });
 
-  // WebKitGTK often fails to honour display scaling (tiny UI on HiDPI / scaled
-  // desktops). We detect the mismatch between the GTK window scale and the
-  // webview's own devicePixelRatio and compensate automatically. Zoom is applied
-  // with the webview's native zoom-level (crisp re-layout), transforming the
-  // #ui-root wrapper as a last-resort fallback.
+  // Zoom handling.
+  //
+  // GTK/WebKitGTK already apply the display scale factor and the
+  // org.gnome.desktop.interface text-scaling-factor on their own, so the app
+  // must NOT try to "correct" anything: a previous heuristic derived a scale
+  // from outer_size()/inner_size(), but both of those report physical pixels,
+  // so the ratio was always ~1.0 and the real factor was 1/devicePixelRatio.
+  // On a display with dpr=2 that produced a 0.5 factor, which shrank the whole
+  // UI and made the UI-scale setting unable to reach 100% again
+  // (150% * 0.5 = 0.75). Zoom is now driven purely by the user's choice.
   function clamp(x: number, lo: number, hi: number) {
     return Math.min(hi, Math.max(lo, x));
   }
 
+  /** GTK display scale factor reported by the backend (reliable on every
+   *  platform). On healthy systems WebKitGTK already applies it and the page's
+   *  devicePixelRatio matches it; on NixOS WebKitGTK sometimes fails to apply
+   *  the display scale (broken GSettings -> bogus devicePixelRatio), which is
+   *  what makes the whole UI render tiny there. We use this as the *reference*
+   *  value to correct that, never as a multiplier on top of a working scale. */
+  let systemScale = $state(1);
+
   async function detectEnvironment() {
     try {
       const m = await miscApi.uiMetrics();
-      const gtkScale = m.inner.width > 0 ? m.physical.width / m.inner.width : 1;
-      let dpr = window.devicePixelRatio || 1;
-      // WebKitGTK (in some Wayland/fractional-scale setups) reports a bogus
-      // devicePixelRatio (e.g. -1/96). Anything outside a sane range is treated
-      // as 1 so the automatic correction never distorts the UI.
-      if (!Number.isFinite(dpr) || dpr < 0.2 || dpr > 8) dpr = 1;
-      const corr = gtkScale / dpr;
-      baseCorrection = Number.isFinite(corr) ? clamp(corr, 0.5, 2) : 1;
+      systemScale = m.scale || 1;
+      // Diagnostics only. Note that WebKitGTK on some Wayland setups reports
+      // nonsense here (devicePixelRatio came back as -1/96 and layout metrics
+      // as huge/negative numbers), which is why zoom is never derived from
+      // these values directly — see applyZoom below.
       void miscApi.uiLog(
-        `env dpr=${dpr} gtk=${m.scale} phys=${m.physical.width}x${m.physical.height} ` +
-          `inner=${m.inner.width}x${m.inner.height} corr=${corr.toFixed(3)}`
+        `env scale=${systemScale} dpr=${window.devicePixelRatio || 1} ` +
+          `phys=${m.physical.width}x${m.physical.height} ` +
+          `logical=${Math.round(m.logical.width)}x${Math.round(m.logical.height)}`
       );
     } catch {
-      baseCorrection = 1;
+      systemScale = 1;
     }
   }
 
   async function applyZoom() {
-    const user = clamp((settings.ui_scale ?? 100) / 100, 0.4, 3);
-    const factor = clamp(user * baseCorrection, 0.4, 3);
+    const user = clamp((settings.ui_scale ?? 100) / 100, 0.5, 3);
+
+    // Correct for WebKitGTK failing to apply the display scale on NixOS.
+    //
+    // On a healthy display `devicePixelRatio` equals the GTK scale factor and
+    // WebKitGTK already scales by itself, so base = sys/dpr = 1 and we only
+    // apply the user's UI-scale choice (this is what the old heuristic got
+    // wrong: it used outer/inner size, both in physical pixels, so it read ~1
+    // and ended up dividing by dpr -> a 0.5 shrink on every HiDPI display).
+    //
+    // When WebKitGTK under-scales (NixOS: dpr is reported too low or even
+    // negative while the GTK scale factor is correct), base > 1 and we zoom up
+    // to compensate. The ratio is clamped so a pathological dpr can never blow
+    // the UI up.
+    const dpr = window.devicePixelRatio || 1;
+    let base = 1;
+    if (systemScale > 0 && Number.isFinite(systemScale) && Number.isFinite(dpr) && dpr > 0) {
+      base = systemScale / dpr;
+    }
+    const factor = clamp(user * clamp(base, 0.5, 3), 0.5, 3);
+
     const wrap = document.getElementById("ui-root");
     const app = document.getElementById("app");
     if (zoomMode === "webview") {
       try {
         const { getCurrentWebview } = await import("@tauri-apps/api/webview");
         await getCurrentWebview().setZoom(factor);
+        void miscApi.uiLog(
+          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} dpr=${dpr})`
+        );
         return;
       } catch {
         zoomMode = "transform";
@@ -85,6 +117,9 @@
     wrap.style.transformOrigin = "top left";
     wrap.style.width = `${100 / factor}%`;
     app.style.overflow = "auto";
+    void miscApi.uiLog(
+      `zoom transform factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} dpr=${dpr})`
+    );
   }
 
   import Header from "./components/Header.svelte";

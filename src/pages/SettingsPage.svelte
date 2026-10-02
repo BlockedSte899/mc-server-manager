@@ -281,6 +281,8 @@
           { value: "110", label: "110%" },
           { value: "125", label: "125%" },
           { value: "150", label: "150%" },
+          { value: "175", label: "175%" },
+          { value: "200", label: "200%" },
         ]}
         onChange={(v) => (settings.ui_scale = parseInt(v) || 100)}
       />

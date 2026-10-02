@@ -1578,18 +1578,26 @@ async fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.shell().open(&url, None).map_err(|e| e.to_string())
 }
 
-/// Display/DPI diagnostics for the frontend: GTK scale factor vs physical vs
-/// logical window size. Lets the UI compute an automatic zoom correction when
-/// WebKitGTK fails to apply display scaling.
+/// Display/DPI diagnostics for the frontend: the GTK scale factor plus logical
+/// and physical window sizes.
+///
+/// Note both `outer_size` and `inner_size` report *physical* pixels, so their
+/// ratio is always ~1.0 and must never be used to derive a scale factor — the
+/// previous frontend zoom heuristic did exactly that and shrank the UI on every
+/// HiDPI display. The real factor is `scale_factor()`, and the logical size is
+/// obtained by dividing the physical size by it.
 #[tauri::command]
 fn ui_metrics(window: tauri::WebviewWindow) -> Result<serde_json::Value, String> {
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let phys = window.outer_size().map_err(|e| e.to_string())?;
     let inner = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
     Ok(serde_json::json!({
         "scale": scale,
-        "physical": { "width": phys.width, "height": phys.height },
-        "inner": { "width": inner.width, "height": inner.height },
+        "physical": { "width": inner.width, "height": inner.height },
+        "logical": {
+            "width": inner.width as f64 / scale,
+            "height": inner.height as f64 / scale,
+        },
     }))
 }
 
