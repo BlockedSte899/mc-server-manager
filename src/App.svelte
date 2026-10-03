@@ -11,7 +11,7 @@
   const path = $derived(getPath());
 
   let zoomReady = $state(false);
-  let zoomMode: "webview" | "transform" = $state("webview");
+  let zoomMode: "webview" | "css" = $state("webview");
 
   $effect(() => {
     if (!zoomReady) return;
@@ -29,14 +29,19 @@
 
   // Zoom handling.
   //
-  // GTK/WebKitGTK already apply the display scale factor and the
-  // org.gnome.desktop.interface text-scaling-factor on their own, so the app
-  // must NOT try to "correct" anything: a previous heuristic derived a scale
-  // from outer_size()/inner_size(), but both of those report physical pixels,
-  // so the ratio was always ~1.0 and the real factor was 1/devicePixelRatio.
-  // On a display with dpr=2 that produced a 0.5 factor, which shrank the whole
-  // UI and made the UI-scale setting unable to reach 100% again
-  // (150% * 0.5 = 0.75). Zoom is now driven purely by the user's choice.
+  // The factor is driven purely by the user's UI-scale setting. Any
+  // "self-calibrating" correction is deliberately avoided: deriving a base
+  // from window.innerWidth vs. the backend logical size breaks the moment the
+  // window is resized without a scale change — logicalSize goes stale, the
+  // bogus ratio sticks, and every applyZoom (e.g. after a theme switch)
+  // re-applies it, shrinking the UI. The NixOS tiny-UI root cause (broken
+  // xftDPI → garbage devicePixelRatio) is fixed at the source instead: the
+  // flake points GSETTINGS_SCHEMA_DIR at the merged schemas directory.
+  //
+  // Linux scales via CSS `zoom`, which re-flows the layout at the new scale —
+  // so the sticky header keeps working while scrolling (a transform would
+  // break sticky and let the header slide down). Other platforms use the
+  // native webview zoom, which is crisp and reliable there.
   function clamp(x: number, lo: number, hi: number) {
     return Math.min(hi, Math.max(lo, x));
   }
@@ -58,9 +63,9 @@
         logicalSize.width = m.logical.width;
         logicalSize.height = m.logical.height;
       }
-      // Diagnostics only. `devicePixelRatio` is unreliable on WebKitGTK/NixOS
-      // (can be tiny/negative), so it is NOT used to derive the zoom — instead
-      // applyZoom compares window.innerWidth against the backend logical size.
+      // Diagnostics only — helps spot a broken WebKitGTK environment
+      // (tiny/negative devicePixelRatio on NixOS without the schemas fix).
+      // The zoom itself is driven purely by the user's UI-scale setting.
       void miscApi.uiLog(
         `env isLinux=${isLinux} scale=${systemScale} dpr=${window.devicePixelRatio || 1} ` +
           `inner=${window.innerWidth}x${window.innerHeight} ` +
@@ -71,28 +76,8 @@
     }
   }
 
-  /**
-   * How far WebKitGTK's effective scale is off from the intended one.
-   *
-   * The window's true logical CSS width is physical / GTK-scale (from the
-   * backend). `window.innerWidth` is what the webview *thinks* it has, which is
-   * inflated when devicePixelRatio is under-reported (the NixOS WebKitGTK bug):
-   * a 1280-logical window may report innerWidth=2560. So innerWidth/logical is
-   * exactly the correction needed — it is 1 on healthy displays (nothing to do)
-   * and >1 when WebKitGTK failed to apply the display scale.
-   */
-  function computeBase(): number {
-    if (logicalSize.width > 0 && window.innerWidth > 0) {
-      const r = window.innerWidth / logicalSize.width;
-      if (Number.isFinite(r) && r > 0.2 && r < 5) return r;
-    }
-    return 1;
-  }
-
   async function applyZoom() {
-    const user = clamp((settings.ui_scale ?? 100) / 100, 0.5, 3);
-    const base = computeBase();
-    const factor = clamp(user * base, 0.5, 3);
+    const factor = clamp((settings.ui_scale ?? 100) / 100, 0.5, 3);
 
     const wrap = document.getElementById("ui-root");
     const app = document.getElementById("app");
@@ -104,33 +89,26 @@
         const { getCurrentWebview } = await import("@tauri-apps/api/webview");
         await getCurrentWebview().setZoom(factor);
         void miscApi.uiLog(
-          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale})`
+          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}%)`
         );
         return;
       } catch {
-        zoomMode = "transform";
-        void miscApi.uiLog(`webview setZoom unavailable → transform`);
+        zoomMode = "css";
+        void miscApi.uiLog(`webview setZoom unavailable → css zoom`);
       }
     }
 
-    // Linux / fallback: scale the wrapping div so the whole UI fills the
-    // window regardless of WebKitGTK's broken devicePixelRatio. We use a
-    // transform + narrower width (rather than CSS `zoom`) so the scaled content
-    // fits the window exactly instead of overflowing into scrollbars.
+    // Linux / fallback: CSS `zoom` re-flows the layout at the new scale, so
+    // the sticky header keeps sticking while the window scrolls (a transform
+    // would break sticky and let the header slide down while scrolling).
     if (factor === 1) {
-      wrap.style.transform = "";
-      wrap.style.transformOrigin = "";
-      wrap.style.width = "";
+      wrap.style.zoom = "";
       if (app) app.style.overflow = "";
       return;
     }
-    wrap.style.transform = `scale(${factor})`;
-    wrap.style.transformOrigin = "top left";
-    wrap.style.width = `${100 / factor}%`;
+    wrap.style.zoom = String(factor);
     if (app) app.style.overflow = "auto";
-    void miscApi.uiLog(
-      `zoom css factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} logical=${Math.round(logicalSize.width)})`
-    );
+    void miscApi.uiLog(`zoom css factor=${factor} (ui_scale=${settings.ui_scale}%)`);
   }
 
   import Header from "./components/Header.svelte";
