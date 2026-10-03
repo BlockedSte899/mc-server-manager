@@ -14,6 +14,9 @@ pub struct GalleryItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthProject {
+    /// Search hits call it "project_id", the full project schema (bulk
+    /// endpoint) calls it "id" — accept both.
+    #[serde(default, alias = "id")]
     pub project_id: String,
     #[serde(default)]
     pub slug: Option<String>,
@@ -45,7 +48,12 @@ pub async fn projects_bulk(ids: &[String]) -> Result<Vec<ModrinthProject>, Strin
         return Ok(Vec::new());
     }
     let ids_json = serde_json::to_string(ids).map_err(|e| e.to_string())?;
-    let url = format!("https://api.modrinth.com/v2/projects?ids={ids_json}");
+    // The JSON array must be percent-encoded — raw [ ] " , in a query string
+    // break the request.
+    let url = format!(
+        "https://api.modrinth.com/v2/projects?ids={}",
+        crate::utils::download::urlencode(&ids_json)
+    );
     let resp = client()
         .get(&url)
         .send()
