@@ -41,62 +41,70 @@
     return Math.min(hi, Math.max(lo, x));
   }
 
-  /** GTK display scale factor reported by the backend (reliable on every
-   *  platform). On healthy systems WebKitGTK already applies it and the page's
-   *  devicePixelRatio matches it; on NixOS WebKitGTK sometimes fails to apply
-   *  the display scale (broken GSettings -> bogus devicePixelRatio), which is
-   *  what makes the whole UI render tiny there. We use this as the *reference*
-   *  value to correct that, never as a multiplier on top of a working scale. */
+  /** GTK display scale factor reported by the backend (diagnostics only). */
   let systemScale = $state(1);
+  /** True logical CSS size of the window (physical / GTK scale factor). */
+  let logicalSize = $state({ width: 0, height: 0 });
+  /** WebKitGTK's native zoom is unreliable on Linux (broken devicePixelRatio),
+   *  so we scale via CSS there instead of webview.setZoom. */
+  let isLinux = $state(false);
 
   async function detectEnvironment() {
+    isLinux = /linux/i.test(navigator.platform || navigator.userAgent || "");
     try {
       const m = await miscApi.uiMetrics();
       systemScale = m.scale || 1;
-      // Diagnostics only. Note that WebKitGTK on some Wayland setups reports
-      // nonsense here (devicePixelRatio came back as -1/96 and layout metrics
-      // as huge/negative numbers), which is why zoom is never derived from
-      // these values directly — see applyZoom below.
+      if (m.logical?.width > 0) {
+        logicalSize.width = m.logical.width;
+        logicalSize.height = m.logical.height;
+      }
+      // Diagnostics only. `devicePixelRatio` is unreliable on WebKitGTK/NixOS
+      // (can be tiny/negative), so it is NOT used to derive the zoom — instead
+      // applyZoom compares window.innerWidth against the backend logical size.
       void miscApi.uiLog(
-        `env scale=${systemScale} dpr=${window.devicePixelRatio || 1} ` +
-          `phys=${m.physical.width}x${m.physical.height} ` +
-          `logical=${Math.round(m.logical.width)}x${Math.round(m.logical.height)}`
+        `env isLinux=${isLinux} scale=${systemScale} dpr=${window.devicePixelRatio || 1} ` +
+          `inner=${window.innerWidth}x${window.innerHeight} ` +
+          `logical=${Math.round(logicalSize.width)}x${Math.round(logicalSize.height)}`
       );
     } catch {
       systemScale = 1;
     }
   }
 
+  /**
+   * How far WebKitGTK's effective scale is off from the intended one.
+   *
+   * The window's true logical CSS width is physical / GTK-scale (from the
+   * backend). `window.innerWidth` is what the webview *thinks* it has, which is
+   * inflated when devicePixelRatio is under-reported (the NixOS WebKitGTK bug):
+   * a 1280-logical window may report innerWidth=2560. So innerWidth/logical is
+   * exactly the correction needed — it is 1 on healthy displays (nothing to do)
+   * and >1 when WebKitGTK failed to apply the display scale.
+   */
+  function computeBase(): number {
+    if (logicalSize.width > 0 && window.innerWidth > 0) {
+      const r = window.innerWidth / logicalSize.width;
+      if (Number.isFinite(r) && r > 0.2 && r < 5) return r;
+    }
+    return 1;
+  }
+
   async function applyZoom() {
     const user = clamp((settings.ui_scale ?? 100) / 100, 0.5, 3);
-
-    // Correct for WebKitGTK failing to apply the display scale on NixOS.
-    //
-    // On a healthy display `devicePixelRatio` equals the GTK scale factor and
-    // WebKitGTK already scales by itself, so base = sys/dpr = 1 and we only
-    // apply the user's UI-scale choice (this is what the old heuristic got
-    // wrong: it used outer/inner size, both in physical pixels, so it read ~1
-    // and ended up dividing by dpr -> a 0.5 shrink on every HiDPI display).
-    //
-    // When WebKitGTK under-scales (NixOS: dpr is reported too low or even
-    // negative while the GTK scale factor is correct), base > 1 and we zoom up
-    // to compensate. The ratio is clamped so a pathological dpr can never blow
-    // the UI up.
-    const dpr = window.devicePixelRatio || 1;
-    let base = 1;
-    if (systemScale > 0 && Number.isFinite(systemScale) && Number.isFinite(dpr) && dpr > 0) {
-      base = systemScale / dpr;
-    }
-    const factor = clamp(user * clamp(base, 0.5, 3), 0.5, 3);
+    const base = computeBase();
+    const factor = clamp(user * base, 0.5, 3);
 
     const wrap = document.getElementById("ui-root");
     const app = document.getElementById("app");
-    if (zoomMode === "webview") {
+    if (!wrap) return;
+
+    // Non-Linux: the native webview zoom is crisp and reliable, use it.
+    if (!isLinux && zoomMode === "webview") {
       try {
         const { getCurrentWebview } = await import("@tauri-apps/api/webview");
         await getCurrentWebview().setZoom(factor);
         void miscApi.uiLog(
-          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} dpr=${dpr})`
+          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale})`
         );
         return;
       } catch {
@@ -104,21 +112,24 @@
         void miscApi.uiLog(`webview setZoom unavailable → transform`);
       }
     }
-    // Fallback: scale the wrapping div (blurry, but works everywhere).
-    if (!wrap || !app) return;
+
+    // Linux / fallback: scale the wrapping div so the whole UI fills the
+    // window regardless of WebKitGTK's broken devicePixelRatio. We use a
+    // transform + narrower width (rather than CSS `zoom`) so the scaled content
+    // fits the window exactly instead of overflowing into scrollbars.
     if (factor === 1) {
       wrap.style.transform = "";
       wrap.style.transformOrigin = "";
       wrap.style.width = "";
-      app.style.overflow = "";
+      if (app) app.style.overflow = "";
       return;
     }
     wrap.style.transform = `scale(${factor})`;
     wrap.style.transformOrigin = "top left";
     wrap.style.width = `${100 / factor}%`;
-    app.style.overflow = "auto";
+    if (app) app.style.overflow = "auto";
     void miscApi.uiLog(
-      `zoom transform factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} dpr=${dpr})`
+      `zoom css factor=${factor} (ui_scale=${settings.ui_scale}% base=${base} systemScale=${systemScale} logical=${Math.round(logicalSize.width)})`
     );
   }
 

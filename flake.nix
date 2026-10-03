@@ -36,13 +36,19 @@
           libxcb
         ];
 
-        version = "1.0.9";
+        version = "1.0.10";
 
         # GSettings schemas that GTK/WebKitGTK need at runtime. nixpkgs nests
         # each package's schemas under share/gsettings-schemas/<name>/…, which
         # GLib's XDG scan does not pick up, and GSETTINGS_SCHEMA_DIR accepts a
-        # single exact gschemas.compiled file — so we merge the XML into one
-        # compiled bundle and point the env var straight at it.
+        # single extra schema *directory* (it appends /gschemas.compiled itself)
+        # — so we merge the XML into one directory and point the env var at it.
+        #
+        # Getting this right is what fixes the NixOS "tiny UI" bug: without the
+        # schemas, WebKitGTK reads the xftDPI = -1 sentinel and derives a
+        # garbage negative devicePixelRatio (-1/96), which renders the whole UI
+        # microscopic. With the directory set, dpr is a healthy 1 and the UI
+        # renders at its natural scale (verified empirically via ui-log).
         gsettingsBundle = pkgs.runCommand "mcsm-gsettings-bundle" { } ''
           mkdir -p "$out/share/glib-2.0/schemas"
           for base in ${pkgs.gtk3} ${pkgs.gsettings-desktop-schemas} ${pkgs.glib}; do
@@ -128,7 +134,7 @@
           postFixup = ''
             wrapProgram $out/bin/mc-server-manager \
               --prefix LD_LIBRARY_PATH : "${pkgs.libayatana-appindicator}/lib" \
-              --set GSETTINGS_SCHEMA_DIR "${gsettingsBundle}/share/glib-2.0/schemas/gschemas.compiled" \
+              --set GSETTINGS_SCHEMA_DIR "${gsettingsBundle}/share/glib-2.0/schemas" \
               ${lib.optionalString (java != null) ''
                 --prefix PATH : "${java}/bin" \
                 --set JAVA_HOME "${java}"
@@ -186,7 +192,7 @@
           ];
           shellHook = ''
             export RUST_BACKTRACE=1
-            export GSETTINGS_SCHEMA_DIR="${gsettingsBundle}/share/glib-2.0/schemas/gschemas.compiled"
+            export GSETTINGS_SCHEMA_DIR="${gsettingsBundle}/share/glib-2.0/schemas"
             export GTK_IM_MODULE=gtk-im-context-simple
             # System-tray icon: libappindicator is dlopen'd at runtime by
             # tray-icon, so its .so must be findable via LD_LIBRARY_PATH.
