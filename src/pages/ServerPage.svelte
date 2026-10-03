@@ -126,7 +126,7 @@
 </script>
 
 {#if id && meta}
-  <div class="px-5 py-6 flex flex-col" style="height: calc(100vh - 56px);">
+  <div class="px-5 py-6 flex flex-col h-full">
     <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
       <div class="flex items-center gap-3 min-w-0">
         <Button

@@ -36,7 +36,7 @@
           libxcb
         ];
 
-        version = "1.0.16";
+        version = "1.0.17";
 
         # GSettings schemas that GTK/WebKitGTK need at runtime. nixpkgs nests
         # each package's schemas under share/gsettings-schemas/<name>/…, which
@@ -139,6 +139,30 @@
                 --prefix PATH : "${java}/bin" \
                 --set JAVA_HOME "${java}"
               ''}
+
+            # XDG desktop entry + icons so the app shows up in Wayland
+            # launchers (niri + noctalia-shell, GNOME, KDE, …). The launcher
+            # discovers it through XDG_DATA_DIRS ($out/share/applications is
+            # picked up when the package is installed into a profile).
+            mkdir -p $out/share/applications $out/share/icons/hicolor/{32x32,128x128,256x256,512x512}/apps
+            install -Dm644 ${./src-tauri/icons/32x32.png} $out/share/icons/hicolor/32x32/apps/mc-server-manager.png
+            install -Dm644 ${./src-tauri/icons/128x128.png} $out/share/icons/hicolor/128x128/apps/mc-server-manager.png
+            install -Dm644 ${./src-tauri/icons/256x256.png} $out/share/icons/hicolor/256x256/apps/mc-server-manager.png
+            install -Dm644 ${./src-tauri/icons/512x512.png} $out/share/icons/hicolor/512x512/apps/mc-server-manager.png
+            install -Dm644 ${./src-tauri/icons/1024x1024.png} $out/share/icons/hicolor/1024x1024/apps/mc-server-manager.png
+            cat > $out/share/applications/mc-server-manager.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=MC Server Manager
+Comment=Manage Minecraft servers: start, stop, console, mods, worlds, backups
+Exec=mc-server-manager
+Icon=mc-server-manager
+Terminal=false
+Categories=Game;
+Keywords=minecraft;server;manager;
+StartupWMClass=dev.mcsm.manager
+EOF
           '';
 
           meta = {

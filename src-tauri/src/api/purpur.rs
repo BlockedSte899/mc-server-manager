@@ -34,9 +34,17 @@ pub async fn latest_build(mc: &str) -> Result<i64, String> {
         return Err(format!("Purpur has no build for {mc} ({})", resp.status()));
     }
     let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    data.get("build")
-        .and_then(|b| b.as_i64())
-        .ok_or_else(|| "no build found".into())
+    // The Purpur API returns "build" as a JSON *string* (e.g. "2535"); older
+    // releases used a number — accept both.
+    let build = data
+        .get("build")
+        .and_then(|b| match b {
+            serde_json::Value::String(s) => s.parse::<i64>().ok(),
+            serde_json::Value::Number(n) => n.as_i64(),
+            _ => None,
+        })
+        .ok_or("no build found")?;
+    Ok(build)
 }
 
 pub fn download_url(mc: &str, build: i64) -> String {

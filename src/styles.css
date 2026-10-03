@@ -47,6 +47,18 @@ body,
   height: 100%;
 }
 
+/* Column layout: header + main share the viewport exactly, so the page never
+   overflows by a stray pixel (the header's border used to push the content
+   1px past 100vh and show a permanent scrollbar). */
+#ui-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+#ui-root > header {
+  flex-shrink: 0;
+}
+
 body {
   background: var(--color-surface-0);
   color: var(--color-fg);

@@ -186,7 +186,7 @@
 <div id="ui-root">
   <Header />
 
-  <main class="min-h-[calc(100vh-56px)]">
+  <main class="flex-1 min-h-0">
     {#if path === "/" || path === ""}
       <ServersPage />
     {:else if path === "/wizard" || path?.startsWith("/wizard")}

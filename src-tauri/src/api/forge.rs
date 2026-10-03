@@ -22,31 +22,62 @@ pub async fn forge_promotions() -> Result<std::collections::HashMap<String, Stri
     Ok(out)
 }
 
-/// MineCraft versions that have any forge builds (derived from promotions).
+/// All installer versions from the Forge maven metadata ("{mc}-{loader}").
+async fn forge_metadata_versions() -> Result<Vec<String>, String> {
+    let url = "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml";
+    let resp = client().get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("Forge maven {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| e.to_string())?;
+    Ok(extract_xml_tags(&xml, "version"))
+}
+
+/// Numeric-aware loader comparison: "52.1.16" > "52.0.63" > "52.0.9".
+fn cmp_loader(a: &str, b: &str) -> std::cmp::Ordering {
+    let seg = |s: &str| -> Vec<u64> {
+        s.split('.')
+            .map(|p| p.chars().take_while(|c| c.is_ascii_digit()).collect::<String>())
+            .filter(|p| !p.is_empty())
+            .map(|p| p.parse::<u64>().unwrap_or(0))
+            .collect()
+    };
+    let (a, b) = (seg(a), seg(b));
+    for i in 0..a.len().max(b.len()) {
+        let (x, y) = (a.get(i).unwrap_or(&0), b.get(i).unwrap_or(&0));
+        match x.cmp(y) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+/// MineCraft versions that have any forge builds, newest first.
 pub async fn forge_minecraft_versions() -> Result<Vec<String>, String> {
-    let promos = forge_promotions().await?;
-    let mut keys: Vec<&String> = promos.keys().collect();
-    keys.sort();
-    keys.reverse();
-    Ok(keys.into_iter().map(|s| s.clone()).collect())
+    let versions = forge_metadata_versions().await?;
+    let mut mcs = std::collections::BTreeSet::new();
+    for v in versions {
+        // entries look like "1.21.1-52.1.16"
+        if let Some((mc, _)) = v.split_once('-') {
+            if mc.starts_with("1.") {
+                mcs.insert(mc.to_string());
+            }
+        }
+    }
+    Ok(crate::utils::mcver::newest_first(mcs.into_iter().collect()))
 }
 
 /// Loader versions (e.g. "47.2.0") available for a minecraft version, newest first.
 pub async fn forge_loaders(mc: &str) -> Result<Vec<String>, String> {
-    let url =
-        format!("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
-    let resp = client().get(&url).send().await.map_err(|e| e.to_string())?;
-    let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let promos = data
-        .get("promos")
-        .and_then(|p| p.as_object())
-        .ok_or("bad promotions json")?;
-    let mut loaders: Vec<String> = promos
-        .keys()
-        .filter_map(|k| k.strip_prefix(&format!("{mc}-")).map(|s| s.to_string()))
+    let versions = forge_metadata_versions().await?;
+    let prefix = format!("{mc}-");
+    let mut loaders: Vec<String> = versions
+        .iter()
+        .filter_map(|v| v.strip_prefix(&prefix).map(|s| s.to_string()))
         .collect();
-    loaders.sort();
-    loaders.reverse();
+    // numeric-aware descending sort
+    loaders.sort_by(|a, b| cmp_loader(b, a));
     Ok(loaders)
 }
 
@@ -65,7 +96,9 @@ pub async fn forge_recommended_loader(mc: &str) -> Result<Option<String>, String
 }
 
 pub fn installer_url(mc: &str, loader: &str) -> String {
-    format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{loader}/{mc}-{loader}-installer.jar")
+    // The maven artifact name carries the "forge-" prefix; "{mc}-{loader}-installer.jar"
+    // (without it) returns 404.
+    format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{loader}/forge-{mc}-{loader}-installer.jar")
 }
 
 /// All NeoForge loader versions, newest first.
