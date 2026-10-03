@@ -38,10 +38,11 @@
   // xftDPI → garbage devicePixelRatio) is fixed at the source instead: the
   // flake points GSETTINGS_SCHEMA_DIR at the merged schemas directory.
   //
-  // Linux scales via CSS `zoom`, which re-flows the layout at the new scale —
-  // so the sticky header keeps working while scrolling (a transform would
-  // break sticky and let the header slide down). Other platforms use the
-  // native webview zoom, which is crisp and reliable there.
+  // The zoom is applied via the native webview page zoom on every platform:
+  // it scales at layout level (the sticky header keeps working), keeps
+  // popups/dropdown positioning correct, and makes media queries respond
+  // naturally to the zoomed viewport. CSS `zoom` on the wrapper remains only
+  // as a fallback when setZoom is unavailable.
   function clamp(x: number, lo: number, hi: number) {
     return Math.min(hi, Math.max(lo, x));
   }
@@ -76,39 +77,46 @@
     }
   }
 
+  let lastZoom = 0;
+
   async function applyZoom() {
     const factor = clamp((settings.ui_scale ?? 100) / 100, 0.5, 3);
+    if (Math.abs(factor - lastZoom) < 0.001) return; // idempotency guard
 
     const wrap = document.getElementById("ui-root");
     const app = document.getElementById("app");
     if (!wrap) return;
 
-    // Non-Linux: the native webview zoom is crisp and reliable, use it.
-    if (!isLinux && zoomMode === "webview") {
-      try {
-        const { getCurrentWebview } = await import("@tauri-apps/api/webview");
-        await getCurrentWebview().setZoom(factor);
-        void miscApi.uiLog(
-          `zoom webview factor=${factor} (ui_scale=${settings.ui_scale}%)`
-        );
-        return;
-      } catch {
+    // Preferred path on every platform: the native webview page zoom. It is
+    // crisp, layout-level (sticky keeps working) and — crucially on WebKitGTK —
+    // it is accounted for when positioning native/custom popups. CSS `zoom` on
+    // an ancestor breaks WebKitGTK's coordinate mapping and made the custom
+    // Select's fixed-position menu open off-window.
+    try {
+      const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+      await getCurrentWebview().setZoom(factor);
+      lastZoom = factor;
+      void miscApi.uiLog(`zoom webview factor=${factor} (ui_scale=${settings.ui_scale}%)`);
+      return;
+    } catch {
+      if (zoomMode === "webview") {
         zoomMode = "css";
         void miscApi.uiLog(`webview setZoom unavailable → css zoom`);
       }
     }
 
-    // Linux / fallback: CSS `zoom` re-flows the layout at the new scale, so
-    // the sticky header keeps sticking while the window scrolls (a transform
-    // would break sticky and let the header slide down while scrolling).
+    // Fallback: CSS `zoom` re-flows the layout at the new scale, so the sticky
+    // header keeps sticking while the window scrolls (a transform would break
+    // sticky and let the header slide down while scrolling).
     if (factor === 1) {
       wrap.style.zoom = "";
       if (app) app.style.overflow = "";
-      return;
+    } else {
+      wrap.style.zoom = String(factor);
+      if (app) app.style.overflow = "auto";
+      void miscApi.uiLog(`zoom css factor=${factor} (ui_scale=${settings.ui_scale}%)`);
     }
-    wrap.style.zoom = String(factor);
-    if (app) app.style.overflow = "auto";
-    void miscApi.uiLog(`zoom css factor=${factor} (ui_scale=${settings.ui_scale}%)`);
+    lastZoom = factor;
   }
 
   import Header from "./components/Header.svelte";
