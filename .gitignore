@@ -8,4 +8,4 @@ releases/
 .DS_Store
 *.swp
 *.log
-result
+result*
