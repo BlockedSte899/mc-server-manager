@@ -17,6 +17,17 @@ pub struct CfMod {
     pub logo: Option<CfLogo>,
     #[serde(default)]
     pub latestFilesIndexes: Vec<CfFileIndex>,
+    /// Only present on the bulk `/v1/mods` endpoint, not on search.
+    #[serde(default)]
+    pub screenshots: Vec<CfScreenshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CfScreenshot {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub thumbnailUrl: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +145,34 @@ pub async fn search(
         url.push_str(&format!("&modLoaderType={id}"));
     }
     get(key, &url).await.map_err(Into::into)
+}
+
+/// Fetches full mod records (incl. `screenshots`) for the given ids in one call.
+pub async fn mods_bulk(key: &str, ids: &[String]) -> Result<Vec<CfMod>, String> {
+    if key.trim().is_empty() {
+        return Err(CfError::MissingKey.into());
+    }
+    let num_ids: Vec<i64> = ids.iter().filter_map(|s| s.parse().ok()).collect();
+    if num_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let body = serde_json::json!({ "modIds": num_ids });
+    let resp = client()
+        .post("https://api.curseforge.com/v1/mods")
+        .header("x-api-key", key)
+        .header("Accept", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| CfError::Api(format!("CurseForge request: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(CfError::Api(format!("CurseForge API {}", resp.status())).into());
+    }
+    let data: CfResp<CfMod> = resp
+        .json()
+        .await
+        .map_err(|e| CfError::Api(format!("CurseForge parse: {e}")))?;
+    Ok(data.data)
 }
 
 pub async fn files(key: &str, project_id: i64) -> Result<Vec<CfFile>, String> {

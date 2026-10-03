@@ -9,7 +9,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
   import type { FileItem, ModrinthProject, CfMod } from "../../lib/types";
-  import { Search, RefreshCw, Upload, Loader2, Download, Power, Trash2, ArrowUpCircle } from "lucide-svelte";
+  import { Search, RefreshCw, Upload, Loader2, Download, Power, Trash2, ArrowUpCircle, ChevronDown } from "lucide-svelte";
   import { isTauri } from "../../lib/env";
   import { t } from "../../lib/i18n.svelte";
 
@@ -25,10 +25,21 @@
   let updating = $state<Record<string, boolean>>({});
   let confirmDelete: FileItem | null = $state(null);
   let mc = $state("");
-  let imgFailed = $state<Record<string, boolean>>({});
   let icons = $state<Record<string, string>>({});
   let iconPending = $state<Record<string, boolean>>({});
   let iconFailed = $state<Record<string, boolean>>({});
+
+  // Every remote image in search results (icons and gallery screenshots) is
+  // fetched through the backend as a cached data URL — WebKitGTK can silently
+  // fail to load remote images inside overlay layouts.
+  let imgCache = $state<Record<string, string>>({});
+  let imgLoading = $state<Record<string, boolean>>({});
+  let imgFailed = $state<Record<string, boolean>>({});
+
+  // Expanded search cards with screenshot galleries.
+  let expanded = $state<Record<string, boolean>>({});
+  let galleries = $state<Record<string, string[]>>({});
+  let galLoading = $state(false);
 
   const core = $derived(servers.find((s) => s.meta.id === id)?.meta.core ?? "paper");
   const serverVersion = $derived(servers.find((s) => s.meta.id === id)?.meta.mc_version ?? "");
@@ -66,6 +77,8 @@
     if (!query.trim()) return;
     searching = true;
     cfResults = [];
+    expanded = {};
+    galleries = {};
     try {
       results = await modsApi.search(query.trim(), core, mc || ".*");
     } catch (e) {
@@ -79,12 +92,65 @@
     if (!query.trim()) return;
     cfSearching = true;
     results = [];
+    expanded = {};
+    galleries = {};
     try {
       cfResults = await modsApi.curseforge(query.trim(), mc || "", core);
     } catch (e) {
       toast(String(e), "error");
     } finally {
       cfSearching = false;
+    }
+  }
+
+  async function loadImg(url: string) {
+    if (!url || imgCache[url] || imgLoading[url] || imgFailed[url]) return;
+    imgLoading[url] = true;
+    try {
+      const data = await modsApi.image(url);
+      if (data) imgCache[url] = data;
+      else imgFailed[url] = true;
+    } catch {
+      imgFailed[url] = true;
+    } finally {
+      imgLoading[url] = false;
+    }
+  }
+
+  // Fetch icons for whatever search results are on screen.
+  $effect(() => {
+    for (const r of results) if (r.icon_url) void loadImg(r.icon_url);
+    for (const r of cfResults) if (r.logo?.url) void loadImg(r.logo.url);
+  });
+
+  // Preload the gallery screenshots of every expanded card.
+  $effect(() => {
+    for (const key of Object.keys(expanded)) {
+      if (!expanded[key]) continue;
+      for (const u of (galleries[key] ?? []).slice(0, 6)) void loadImg(u);
+    }
+  });
+
+  function isExpanded(key: string) {
+    return !!expanded[key];
+  }
+
+  async function toggleExpand(key: string, source: "modrinth" | "curseforge") {
+    expanded = { ...expanded, [key]: !expanded[key] };
+    if (!expanded[key]) return;
+    const active = source === "modrinth" ? results : cfResults;
+    if (Object.keys(galleries).length > 0 || galLoading) return;
+    if (active.length === 0) return;
+    galLoading = true;
+    try {
+      const ids = active.map((r) =>
+        source === "curseforge" ? String((r as CfMod).id) : (r as ModrinthProject).project_id
+      );
+      galleries = await modsApi.gallery(source, ids);
+    } catch {
+      /* no previews available */
+    } finally {
+      galLoading = false;
     }
   }
 
@@ -190,33 +256,71 @@
     <p class="text-xs text-fg-dim uppercase tracking-wide">{t("Modrinth results")}</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       {#each results as r (r.project_id)}
-        <div class="rounded-lg border border-edge bg-surface-1 p-3 flex items-start gap-3">
-          {#if r.icon_url && !imgFailed[r.project_id]}
-            <img src={r.icon_url} alt="" class="w-10 h-10 rounded-lg object-cover bg-surface-2" loading="lazy" onerror={() => (imgFailed[r.project_id] = true)} />
-          {:else}
-            <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center text-lg font-bold text-brand-400">{r.title.slice(0, 1)}</div>
-          {/if}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-medium text-sm text-slate-100 truncate">{r.title}</span>
-              <Badge class="bg-surface-2 text-fg-dim shrink-0">{(r.downloads / 1000).toFixed(1)}k</Badge>
-            </div>
-            <p class="text-xs text-fg-dim mt-0.5 line-clamp-2">{r.description ?? ""}</p>
-            <div class="flex items-center justify-between mt-2">
-              <span class="text-[10px] text-fg-dim uppercase tracking-wide">
-                {r.server_side === "unsupported" ? t("server: unsupported") : r.server_side === "required" ? t("required") : t("compatible")} · {(r.game_versions ?? []).slice(-3).join(", ") || t("any")}
-              </span>
-              <Button
-                variant="ghost"
-                size="xs"
-                disabled={installing[r.project_id] || r.server_side === "unsupported"}
-                onclick={() => install(r.project_id, r.title)}
-              >
-                {#if installing[r.project_id]}<Loader2 size={13} class="animate-spin" />{:else}<Download size={13} />{/if}
-                {t("Install")}
-              </Button>
-            </div>
+        <div class="rounded-lg border border-edge bg-surface-1 p-3 flex flex-col gap-2 {isExpanded(r.project_id) ? 'md:col-span-2' : ''}">
+          <div class="flex items-start gap-3">
+            <button class="shrink-0 cursor-pointer" title={t("Toggle preview")} onclick={() => toggleExpand(r.project_id, "modrinth")}>
+              {#if r.icon_url && imgCache[r.icon_url]}
+                <img src={imgCache[r.icon_url]} alt="" class="w-10 h-10 rounded-lg object-cover bg-surface-2" />
+              {:else if r.icon_url && !imgFailed[r.icon_url]}
+                <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center">
+                  <Loader2 size={13} class="animate-spin text-fg-dim" />
+                </div>
+              {:else}
+                <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center text-lg font-bold text-brand-400">{r.title.slice(0, 1)}</div>
+              {/if}
+            </button>
+            <button class="flex-1 min-w-0 text-left cursor-pointer group" onclick={() => toggleExpand(r.project_id, "modrinth")}>
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-sm text-slate-100 truncate group-hover:text-brand-300">{r.title}</span>
+                <Badge class="bg-surface-2 text-fg-dim shrink-0">{(r.downloads / 1000).toFixed(1)}k</Badge>
+              </div>
+              <p class="text-xs text-fg-dim mt-0.5 line-clamp-2">{r.description ?? ""}</p>
+            </button>
+            <button
+              class="shrink-0 self-center cursor-pointer text-fg-dim hover:text-white"
+              title={t("Toggle preview")}
+              onclick={() => toggleExpand(r.project_id, "modrinth")}
+            >
+              <ChevronDown size={15} class="transition-transform {isExpanded(r.project_id) ? 'rotate-180' : ''}" />
+            </button>
           </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-fg-dim uppercase tracking-wide">
+              {r.server_side === "unsupported" ? t("server: unsupported") : r.server_side === "required" ? t("required") : t("compatible")} · {(r.game_versions ?? []).slice(-3).join(", ") || t("any")}
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={installing[r.project_id] || r.server_side === "unsupported"}
+              onclick={() => install(r.project_id, r.title)}
+            >
+              {#if installing[r.project_id]}<Loader2 size={13} class="animate-spin" />{:else}<Download size={13} />{/if}
+              {t("Install")}
+            </Button>
+          </div>
+          {#if isExpanded(r.project_id)}
+            <div class="border-t border-edge pt-2">
+              {#if galLoading && !galleries[r.project_id]}
+                <div class="flex items-center gap-2 text-xs text-fg-dim py-2">
+                  <Loader2 size={13} class="animate-spin" /> {t("Loading preview…")}
+                </div>
+              {:else if (galleries[r.project_id] ?? []).length === 0}
+                <p class="text-xs text-fg-dim py-1">{t("No screenshots available.")}</p>
+              {:else}
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                  {#each (galleries[r.project_id] ?? []).slice(0, 6) as gurl (`${r.project_id}:${gurl}`)}
+                    {#if imgCache[gurl]}
+                      <img src={imgCache[gurl]} alt="" class="h-36 rounded-lg border border-edge object-cover shrink-0" />
+                    {:else}
+                      <div class="h-36 w-56 rounded-lg border border-edge bg-surface-2 flex items-center justify-center shrink-0">
+                        <Loader2 size={15} class="animate-spin text-fg-dim" />
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -226,22 +330,62 @@
     <p class="text-xs text-fg-dim uppercase tracking-wide">{t("CurseForge results (modpack/plugin contexts)")}</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       {#each cfResults as r (r.id)}
-        <div class="rounded-lg border border-edge bg-surface-1 p-3 flex items-start gap-3">
-          {#if r.logo?.url && !imgFailed[String(r.id)]}
-            <img src={r.logo.url} alt="" class="w-10 h-10 rounded-lg object-cover bg-surface-2" loading="lazy" onerror={() => (imgFailed[String(r.id)] = true)} />
-          {:else}
-            <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center text-lg font-bold text-brand-400">{r.name.slice(0, 1)}</div>
-          {/if}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-medium text-sm text-slate-100 truncate">{r.name}</span>
-              <Badge class="bg-surface-2 text-fg-dim shrink-0">{(r.downloadCount / 1000).toFixed(1)}k</Badge>
-            </div>
-            <p class="text-xs text-fg-dim mt-0.5 line-clamp-2">{r.summary}</p>
-            <div class="text-[10px] text-fg-dim mt-1 uppercase tracking-wide">
-              {r.latestFilesIndexes?.map((f) => f.gameVersion).filter(Boolean).slice(-3).join(", ") || "any"}
-            </div>
+        <div class="rounded-lg border border-edge bg-surface-1 p-3 flex flex-col gap-2 {isExpanded(String(r.id)) ? 'md:col-span-2' : ''}">
+          <div class="flex items-start gap-3">
+            <button class="shrink-0 cursor-pointer" title={t("Toggle preview")} onclick={() => toggleExpand(String(r.id), "curseforge")}>
+              {#if r.logo?.url && imgCache[r.logo.url]}
+                <img src={imgCache[r.logo.url]} alt="" class="w-10 h-10 rounded-lg object-cover bg-surface-2" />
+              {:else if r.logo?.url && !imgFailed[r.logo.url]}
+                <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center">
+                  <Loader2 size={13} class="animate-spin text-fg-dim" />
+                </div>
+              {:else}
+                <div class="w-10 h-10 rounded-lg bg-surface-2 border border-edge flex items-center justify-center text-lg font-bold text-brand-400">{r.name.slice(0, 1)}</div>
+              {/if}
+            </button>
+            <button class="flex-1 min-w-0 text-left cursor-pointer group" onclick={() => toggleExpand(String(r.id), "curseforge")}>
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-sm text-slate-100 truncate group-hover:text-brand-300">{r.name}</span>
+                <Badge class="bg-surface-2 text-fg-dim shrink-0">{(r.downloadCount / 1000).toFixed(1)}k</Badge>
+              </div>
+              <p class="text-xs text-fg-dim mt-0.5 line-clamp-2">{r.summary}</p>
+            </button>
+            <button
+              class="shrink-0 self-center cursor-pointer text-fg-dim hover:text-white"
+              title={t("Toggle preview")}
+              onclick={() => toggleExpand(String(r.id), "curseforge")}
+            >
+              <ChevronDown size={15} class="transition-transform {isExpanded(String(r.id)) ? 'rotate-180' : ''}" />
+            </button>
           </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-fg-dim uppercase tracking-wide">
+              {r.latestFilesIndexes?.map((f) => f.gameVersion).filter(Boolean).slice(-3).join(", ") || "any"}
+            </span>
+          </div>
+          {#if isExpanded(String(r.id))}
+            <div class="border-t border-edge pt-2">
+              {#if galLoading && !galleries[String(r.id)]}
+                <div class="flex items-center gap-2 text-xs text-fg-dim py-2">
+                  <Loader2 size={13} class="animate-spin" /> {t("Loading preview…")}
+                </div>
+              {:else if (galleries[String(r.id)] ?? []).length === 0}
+                <p class="text-xs text-fg-dim py-1">{t("No screenshots available.")}</p>
+              {:else}
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                  {#each (galleries[String(r.id)] ?? []).slice(0, 6) as gurl (`${r.id}:${gurl}`)}
+                    {#if imgCache[gurl]}
+                      <img src={imgCache[gurl]} alt="" class="h-36 rounded-lg border border-edge object-cover shrink-0" />
+                    {:else}
+                      <div class="h-36 w-56 rounded-lg border border-edge bg-surface-2 flex items-center justify-center shrink-0">
+                        <Loader2 size={15} class="animate-spin text-fg-dim" />
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/each}
     </div>

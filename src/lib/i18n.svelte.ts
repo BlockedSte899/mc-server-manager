@@ -357,6 +357,9 @@ const ru: Dict = {
   "Create Server": "Создать сервер",
   "Server name is required": "Имя сервера обязательно",
   "Select a {core} loader version first": "Сначала выберите версию загрузчика {core}",
+  "Toggle preview": "Показать/скрыть превью",
+  "Loading preview…": "Загрузка превью…",
+  "No screenshots available.": "Скриншоты недоступны.",
   "Server \"{name}\" created": "Сервер «{name}» создан",
   "Failed to create: {e}": "Не удалось создать: {e}",
 

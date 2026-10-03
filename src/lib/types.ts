@@ -159,6 +159,7 @@ export interface ModrinthProject {
   client_side: string | null;
   game_versions: string[];
   loaders: string[];
+  gallery?: { url: string; featured?: boolean }[];
 }
 
 export interface ModrinthVersion {
@@ -257,6 +258,7 @@ export interface CfMod {
   downloadCount: number;
   logo?: { url?: string | null };
   latestFilesIndexes: { gameVersion: string | null; fileId: number }[];
+  screenshots?: { url?: string; thumbnailUrl?: string | null }[];
 }
 
 export interface ImportRequest {

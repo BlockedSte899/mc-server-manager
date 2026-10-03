@@ -5,6 +5,14 @@ use crate::api::client;
 use crate::utils::download::urlencode;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GalleryItem {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub featured: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthProject {
     pub project_id: String,
     #[serde(default)]
@@ -26,6 +34,27 @@ pub struct ModrinthProject {
     pub game_versions: Vec<String>,
     #[serde(default)]
     pub loaders: Vec<String>,
+    /// Search hits don't include it; the bulk projects endpoint does.
+    #[serde(default)]
+    pub gallery: Vec<GalleryItem>,
+}
+
+/// Fetches full project records (incl. `gallery`) for the given ids in one call.
+pub async fn projects_bulk(ids: &[String]) -> Result<Vec<ModrinthProject>, String> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ids_json = serde_json::to_string(ids).map_err(|e| e.to_string())?;
+    let url = format!("https://api.modrinth.com/v2/projects?ids={ids_json}");
+    let resp = client()
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Modrinth API error: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Modrinth API {}", resp.status()));
+    }
+    resp.json().await.map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

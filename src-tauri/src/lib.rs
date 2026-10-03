@@ -902,6 +902,46 @@ async fn curseforge_search(
     api::curseforge::search(&key, &query, &mc, &core, limit).await
 }
 
+/// Screenshot galleries for search results: Modrinth via the bulk projects
+/// endpoint, CurseForge via the bulk /v1/mods endpoint.
+#[tauri::command]
+async fn mods_gallery(
+    state: State<'_, AppState>,
+    source: String,
+    ids: Vec<String>,
+) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    let mut out: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    if source == "curseforge" {
+        let settings = state.settings.lock().await.clone();
+        let key = settings.curseforge_api_key.clone().unwrap_or_default();
+        let mods = api::curseforge::mods_bulk(&key, &ids)
+            .await
+            .map_err(|e| e.to_string())?;
+        for m in mods {
+            let urls: Vec<String> = m
+                .screenshots
+                .iter()
+                .filter(|s| !s.url.is_empty())
+                .map(|s| s.url.clone())
+                .take(8)
+                .collect();
+            out.insert(m.id.to_string(), urls);
+        }
+    } else {
+        for p in api::modrinth::projects_bulk(&ids).await? {
+            let urls: Vec<String> = p
+                .gallery
+                .iter()
+                .map(|g| g.url.clone())
+                .filter(|u| !u.is_empty())
+                .take(8)
+                .collect();
+            out.insert(p.project_id.clone(), urls);
+        }
+    }
+    Ok(out)
+}
+
 // ---------------------------------------------------------------------------
 // worlds
 // ---------------------------------------------------------------------------
@@ -1791,6 +1831,7 @@ pub fn run() {
             update_mod,
             mod_icon,
             curseforge_search,
+            mods_gallery,
             worlds_list,
             worlds_backup,
             worlds_list_backups,

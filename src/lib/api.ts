@@ -115,6 +115,9 @@ export const modsApi = {
   update: (id: string, filename: string) =>
     call<{ filename: string; folder: string; path: string }>("update_mod", { id, filename }),
   icon: (id: string, filename: string) => call<string | null>("mod_icon", { id, name: filename }),
+  gallery: (source: string, ids: string[]) =>
+    call<Record<string, string[]>>("mods_gallery", { source, ids }),
+  image: (url: string) => call<string | null>("modrinth_icon", { url }),
 };
 
 export const worldsApi = {
