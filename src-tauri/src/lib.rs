@@ -932,7 +932,7 @@ async fn mods_gallery(
             let urls: Vec<String> = p
                 .gallery
                 .iter()
-                .map(|g| g.url.clone())
+                .map(|g| g.url().to_string())
                 .filter(|u| !u.is_empty())
                 .take(8)
                 .collect();

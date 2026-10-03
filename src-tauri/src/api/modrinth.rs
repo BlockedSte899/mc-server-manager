@@ -12,6 +12,24 @@ pub struct GalleryItem {
     pub featured: bool,
 }
 
+/// Search hits carry `gallery` as a plain array of URL strings, the full
+/// project schema (bulk endpoint) uses objects — accept both.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GalleryEntry {
+    Full(GalleryItem),
+    Url(String),
+}
+
+impl GalleryEntry {
+    pub fn url(&self) -> &str {
+        match self {
+            GalleryEntry::Full(g) => &g.url,
+            GalleryEntry::Url(u) => u,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthProject {
     /// Search hits call it "project_id", the full project schema (bulk
@@ -37,9 +55,10 @@ pub struct ModrinthProject {
     pub game_versions: Vec<String>,
     #[serde(default)]
     pub loaders: Vec<String>,
-    /// Search hits don't include it; the bulk projects endpoint does.
+    /// Search hits don't include it (bulk does); search returns URL strings,
+    /// bulk returns objects.
     #[serde(default)]
-    pub gallery: Vec<GalleryItem>,
+    pub gallery: Vec<GalleryEntry>,
 }
 
 /// Fetches full project records (incl. `gallery`) for the given ids in one call.
@@ -231,5 +250,34 @@ pub fn loader_for_core(core: &str) -> (&'static str, &'static str) {
         "fabric" => ("fabric", "mod"),
         "quilt" => ("quilt", "mod"),
         _ => ("", "mod"),
+    }
+}
+
+#[cfg(test)]
+mod bulk_parse_tests {
+    use super::{ModrinthProject, SearchResp};
+
+    /// Temporary diagnostic: parse real API responses captured to /tmp.
+    #[test]
+    fn bulk_body_parses() {
+        let body: &str = &std::fs::read_to_string("/tmp/opencode/bulk.json").expect("body file");
+        let arr: serde_json::Value = serde_json::from_str(body).expect("root json");
+        let arr = arr.as_array().expect("array");
+        let mut errs: Vec<String> = Vec::new();
+        for (i, v) in arr.iter().enumerate() {
+            if let Err(e) = serde_json::from_value::<ModrinthProject>(v.clone()) {
+                errs.push(format!("#{}: {e}", i));
+            }
+        }
+        assert!(errs.is_empty(), "decode failures: {errs:?}");
+    }
+
+    #[test]
+    fn search_body_parses() {
+        let body: &str = &std::fs::read_to_string("/tmp/opencode/search.json").expect("body file");
+        match serde_json::from_str::<SearchResp>(body) {
+            Ok(r) => assert!(!r.hits.is_empty()),
+            Err(e) => panic!("search decode failed: {e}"),
+        }
     }
 }
