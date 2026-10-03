@@ -246,6 +246,11 @@ fn spawn_metrics(
             sys.refresh_cpu_usage();
             sys.refresh_memory();
             let proc_pid = sysinfo::Pid::from_u32(pid);
+            // The java process was started AFTER the System snapshot was
+            // created, so it is not in the process list yet — refresh it
+            // explicitly every tick or sys.process(pid) stays None forever
+            // (and the UI shows "—" for CPU/RAM).
+            let _ = sys.refresh_process(proc_pid);
             let (proc_cpu, proc_mem) = match sys.process(proc_pid) {
                 Some(p) => (Some(p.cpu_usage()), Some(p.memory())),
                 None => (None, None),

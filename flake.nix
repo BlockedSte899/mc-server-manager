@@ -36,7 +36,7 @@
           libxcb
         ];
 
-        version = "1.0.18";
+        version = "1.0.19";
 
         # GSettings schemas that GTK/WebKitGTK need at runtime. nixpkgs nests
         # each package's schemas under share/gsettings-schemas/<name>/…, which

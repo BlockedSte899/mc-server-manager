@@ -1,7 +1,7 @@
 {
   "name": "mc-server-manager",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
