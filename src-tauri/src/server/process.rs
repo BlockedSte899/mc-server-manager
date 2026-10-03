@@ -274,10 +274,17 @@ fn java_command(java: &Path, meta: &ServerMeta, server_dir: &Path) -> tokio::pro
     cmd.arg(format!("-Xms{}M", meta.min_ram))
         .arg(format!("-Xmx{}M", meta.max_ram));
     cmd.args(crate::server::jvm::extra_args(meta));
-    cmd.arg("-jar")
-        .arg(server_dir.join(&meta.jar))
-        .arg("nogui")
-        .current_dir(server_dir)
+    if meta.jar.ends_with("unix_args.txt") {
+        // Modern Forge/NeoForge: launch via the installer's @args file
+        // (java @libraries/<core>/<ver>/unix_args.txt) instead of -jar.
+        cmd.arg(format!("@{}", server_dir.join(&meta.jar).display()))
+            .arg("nogui");
+    } else {
+        cmd.arg("-jar")
+            .arg(server_dir.join(&meta.jar))
+            .arg("nogui");
+    }
+    cmd.current_dir(server_dir)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());

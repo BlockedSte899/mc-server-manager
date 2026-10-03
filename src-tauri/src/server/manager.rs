@@ -183,6 +183,12 @@ async fn resolve_core(
     mc: &str,
     loader: &Option<String>,
 ) -> Result<Resolution, String> {
+    // An empty string must be treated like "not selected" — otherwise the
+    // installer URL is built with a blank loader ("neoforge--installer.jar").
+    let loader = loader
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     match core {
         "paper" => {
             let dl = api::paper::latest_build("paper", mc).await?;
@@ -307,6 +313,12 @@ pub async fn install_forge(
         return Err(format!("{core} installer exited with {status}"));
     }
     let _ = std::fs::remove_file(&installer);
+    // Modern Forge/NeoForge have no runnable jar: the installer leaves an
+    // args file (run.sh does `java @libraries/.../unix_args.txt`). Prefer it;
+    // fall back to a plain jar for older installer layouts.
+    if let Some(args) = crate::server::installers::detect_args_file(server_dir, core) {
+        return Ok(Some(args));
+    }
     Ok(crate::server::installers::detect_server_jar(
         server_dir, core,
     ))

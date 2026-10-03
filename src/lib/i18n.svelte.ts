@@ -356,6 +356,7 @@ const ru: Dict = {
   "Accept Minecraft EULA": "Принять Minecraft EULA",
   "Create Server": "Создать сервер",
   "Server name is required": "Имя сервера обязательно",
+  "Select a {core} loader version first": "Сначала выберите версию загрузчика {core}",
   "Server \"{name}\" created": "Сервер «{name}» создан",
   "Failed to create: {e}": "Не удалось создать: {e}",
 

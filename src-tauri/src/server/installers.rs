@@ -1,5 +1,35 @@
 use std::path::Path;
 
+/// Finds the `unix_args.txt` launcher file that modern Forge/NeoForge
+/// installers produce (the real run target: `java @libraries/.../unix_args.txt`
+/// — there is no runnable jar in the directory anymore). Returns the path
+/// relative to `server_dir`, newest version first.
+pub fn detect_args_file(dir: &Path, core: &str) -> Option<String> {
+    let rel = match core {
+        "forge" => "libraries/net/minecraftforge/forge",
+        "neoforge" => "libraries/net/neoforged/neoforge",
+        _ => return None,
+    };
+    let base = dir.join(rel);
+    let mut best: Option<(std::time::SystemTime, String)> = None;
+    if let Ok(versions) = std::fs::read_dir(&base) {
+        for v in versions.flatten() {
+            let args = v.path().join("unix_args.txt");
+            if !args.is_file() {
+                continue;
+            }
+            let modified = args
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::UNIX_EPOCH);
+            if best.as_ref().is_none_or(|(t, _)| modified > *t) {
+                best = Some((modified, format!("{rel}/{}/unix_args.txt", v.file_name().to_string_lossy())));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
 /// Picks the most likely runnable server jar in a directory,
 /// preferring ones that look like the core (forge/neoforge/fabric/quilt/nuke).
 pub fn detect_server_jar(dir: &Path, core: &str) -> Option<String> {

@@ -137,6 +137,10 @@
       toast(t("Server name is required"), "error");
       return;
     }
+    if (needsLoader() && !loaderVersion.trim()) {
+      toast(t("Select a {core} loader version first", { core }), "error");
+      return;
+    }
     importing = true;
     progress = 0;
     stage = "starting";
