@@ -36,7 +36,7 @@
           libxcb
         ];
 
-        version = "1.0.15";
+        version = "1.0.16";
 
         # GSettings schemas that GTK/WebKitGTK need at runtime. nixpkgs nests
         # each package's schemas under share/gsettings-schemas/<name>/…, which
@@ -115,7 +115,7 @@
             src = ./.;
             pnpm = pkgs.pnpm_10;
             fetcherVersion = 4;
-            hash = "sha256-Wc565ZDtExPxaHfDGqUQv8AR7K9Pwwj2Xt4MtjjxkUQ=";
+            hash = "sha256-imw/8HkNbQmngxgDDiH4ThpmGSvb8NMBwbFdMNf1vDI=";
           };
 
           preBuild = ''
