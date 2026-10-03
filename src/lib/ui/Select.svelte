@@ -26,23 +26,34 @@
   let open = $state(false);
   let rootEl = $state<HTMLElement | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
-  let pos = $state<{ top: number; left: number; width: number } | null>(null);
+  let pos = $state<{ top: number | null; bottom: number | null; left: number; width: number } | null>(null);
 
   const selected = $derived(options.find((o) => o.value === value));
 
-  // Position the open menu relative to #ui-root (the zoom/transform wrapper),
-  // so `position: fixed` is unaffected by ancestor overflow clipping and by
-  // the optional webview-zoom transform fallback.
+  // The menu is `position: fixed`, i.e. positioned relative to the *viewport* —
+  // exactly what getBoundingClientRect() reports. The native webview page zoom
+  // (the primary scaling path) keeps these coordinates consistent, so the menu
+  // opens right under (or above) the trigger regardless of zoom level.
+  //
+  // (An older version subtracted the #ui-root rect here; that was only valid
+  // while a CSS transform on the wrapper made it the containing block for
+  // fixed elements — under plain page zoom it made the menu drift down by the
+  // scroll offset and open outside the window.)
+  const MENU_MAX_H = 256;
+  const rowH = 32; // px-3 py-1.5 text-sm ≈ 32px per row
+
   function place() {
     if (!rootEl) return;
     const r = rootEl.getBoundingClientRect();
-    const wrap = document.getElementById("ui-root");
-    const w = wrap?.getBoundingClientRect();
-    pos = {
-      top: r.bottom - (w?.top ?? 0) + 4,
-      left: r.left - (w?.left ?? 0),
-      width: r.width,
-    };
+    const h = Math.min(MENU_MAX_H, options.length * rowH + 8);
+    const below = window.innerHeight - r.bottom - 8;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8));
+    if (below < h && r.top - 8 > below) {
+      // not enough room below the trigger — open upward instead
+      pos = { top: null, bottom: window.innerHeight - r.top + 4, left, width: r.width };
+    } else {
+      pos = { top: r.bottom + 4, bottom: null, left, width: r.width };
+    }
   }
 
   function toggle() {
@@ -107,8 +118,8 @@
   <ul
     role="listbox"
     bind:this={menuEl}
-    class="fixed z-[100] mt-1 py-1 rounded-lg border border-edge bg-surface-1 shadow-xl shadow-black/40 max-h-64 overflow-y-auto"
-    style="top: {pos.top}px; left: {pos.left}px; width: {pos.width}px;"
+    class="fixed z-[100] py-1 rounded-lg border border-edge bg-surface-1 shadow-xl shadow-black/40 max-h-64 overflow-y-auto"
+    style="top: {pos.top !== null ? `${pos.top}px` : "auto"}; bottom: {pos.bottom !== null ? `${pos.bottom}px` : "auto"}; left: {pos.left}px; width: {pos.width}px;"
   >
     {#each options as opt (opt.value)}
       <li

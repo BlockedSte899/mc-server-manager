@@ -34,7 +34,7 @@ Add it as an input — in your `flake.nix`:
     mc-server-manager = {
       url = "github:BlockedSte899/mc-server-manager";
       # pin to a release tag once you have one:
-      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v1.0.13";
+      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v1.0.14";
     };
   };
 
@@ -143,8 +143,8 @@ package is fetched instead of compiled.
 Grab the `.AppImage` from [Releases](https://github.com/BlockedSte899/mc-server-manager/releases):
 
 ```bash
-chmod +x MC_Server_Manager_1.0.13_amd64.AppImage
-./MC_Server_Manager_1.0.13_amd64.AppImage
+chmod +x MC_Server_Manager_1.0.14_amd64.AppImage
+./MC_Server_Manager_1.0.14_amd64.AppImage
 ```
 
 The AppImage bundles its own libraries, so it runs on Ubuntu, Fedora, Arch and friends
@@ -152,22 +152,22 @@ without installing dependencies. Some distributions (Fedora, some Arch setups) r
 
 ```bash
 sudo apt install libfuse2      # Debian / Ubuntu
-./MC_Server_Manager_1.0.13_amd64.AppImage --appimage-extract-and-run   # no FUSE
+./MC_Server_Manager_1.0.14_amd64.AppImage --appimage-extract-and-run   # no FUSE
 ```
 
 ### .deb / .rpm
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./mc-server-manager_1.0.13_amd64.deb
+sudo apt install ./mc-server-manager_1.0.14_amd64.deb
 
 # Fedora / openSUSE
-sudo dnf install ./mc-server-manager-1.0.13-1.x86_64.rpm
+sudo dnf install ./mc-server-manager-1.0.14-1.x86_64.rpm
 ```
 
 ### Windows
 
-Download the NSIS installer (`MC Server Manager_1.0.13_x64-setup.exe`) from
+Download the NSIS installer (`MC Server Manager_1.0.14_x64-setup.exe`) from
 [Releases](https://github.com/BlockedSte899/mc-server-manager/releases). It installs per
 user, needs no separate runtime, and ships English and Russian. An MSI is provided too.
 
@@ -209,8 +209,8 @@ Release binaries are produced by [`.github/workflows/build.yml`](.github/workflo
 on tag pushes and are published to GitHub Releases automatically:
 
 ```bash
-git tag v1.0.13
-git push origin v1.0.13
+git tag v1.0.14
+git push origin v1.0.14
 ```
 
 ## License
