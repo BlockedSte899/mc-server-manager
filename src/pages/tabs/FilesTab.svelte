@@ -48,7 +48,6 @@
   let uploading = $state(false);
 
   let editor = $state<{ path: string; name: string; content: string } | null>(null);
-  let editorDraft = $state("");
   let createOpen = $state(false);
   let createName = $state("");
   let createIsDir = $state(false);
@@ -59,13 +58,8 @@
   let confirmDelete = $state(false);
   let clip = $state<{ mode: "copy" | "cut"; paths: string[] } | null>(null);
 
-  let taRef: HTMLTextAreaElement | undefined = $state();
-  let preRef: HTMLPreElement | undefined = $state();
-  let gutterRef: HTMLDivElement | undefined = $state();
-
   const join = (p: string, name: string) => (p ? `${p}/${name}` : name);
   const segments = $derived(path ? path.split("/") : []);
-  const LINE_H = "1.5em";
 
   const sortedEntries = $derived(
     [...entries].sort((a, b) => {
@@ -184,18 +178,15 @@
         return;
       }
       editor = { path: relOf(entry.name), name: entry.name, content };
-      editorDraft = content;
-      undoStack = [];
-      redoStack = [];
     } catch (e) {
       toast(String(e), "error");
     }
   }
 
-  async function saveEditor() {
+  async function saveEditor(newContent: string) {
     if (!editor) return;
     try {
-      await filesApi.write(id, editor.path, editorDraft);
+      await filesApi.write(id, editor.path, newContent);
       toast(t("Saved"), "success");
       editor = null;
       refresh();
@@ -320,167 +311,6 @@
   const zipCandidate = $derived(
     selected.length === 1 ? entries.find((e) => e.name === selected[0] && e.name.toLowerCase().endsWith(".zip")) : null
   );
-
-  // ---- editor highlighting -------------------------------------------------
-
-  function langFor(
-    name: string
-  ): "props" | "json" | "yaml" | "xml/html" | "code" | "md" | "sql" | "text" {
-    const n = name.toLowerCase();
-    if (n.endsWith(".properties") || n === "server.properties") return "props";
-    if (n.endsWith(".toml") || n.endsWith(".cfg") || n.endsWith(".conf") || n.endsWith(".ini")) return "props";
-    if (n.endsWith(".json") || n.endsWith(".json5") || n.endsWith(".mcmeta") || n.endsWith(".lang")) return "json";
-    if (n.endsWith(".yml") || n.endsWith(".yaml")) return "yaml";
-    if (n.endsWith(".xml") || n.endsWith(".html") || n.endsWith(".htm") || n.endsWith(".xhtml") || n.endsWith(".svg")) return "xml/html";
-    if (
-      n.endsWith(".java") || n.endsWith(".js") || n.endsWith(".mjs") || n.endsWith(".cjs") ||
-      n.endsWith(".ts") || n.endsWith(".tsx") || n.endsWith(".jsx") || n.endsWith(".css") ||
-      n.endsWith(".scss") || n.endsWith(".kotlin") || n.endsWith(".kts") || n.endsWith(".groovy") ||
-      n.endsWith(".sh") || n.endsWith(".bash") || n.endsWith(".py") || n.endsWith(".pyw") ||
-      n.endsWith(".rs") || n.endsWith(".go") || n.endsWith(".c") || n.endsWith(".h") ||
-      n.endsWith(".cc") || n.endsWith(".cpp") || n.endsWith(".hpp") || n.endsWith(".cs") ||
-      n.endsWith(".rb") || n.endsWith(".pl") || n.endsWith(".php") || n.endsWith(".swift") ||
-      n.endsWith(".gradle") || n.endsWith(".properties") || n.endsWith(".mcmeta")
-    ) return "code";
-    if (n.endsWith(".sql") || n === "sqlite") return "sql";
-    if (n.endsWith(".md") || n.endsWith(".markdown") || n.endsWith(".txt") || n.endsWith(".log")) return "md";
-    return "text";
-  }
-
-  function hl(line: string, lang: string): string {
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const span = (cls: string, t: string) => `<span class="${cls}">${t}</span>`;
-    if (lang === "text") return esc(line);
-    const src = esc(line);
-    if (lang === "props" || lang === "yaml") {
-      return src
-        .split("\n")
-        .map((line) => {
-          if (/^\s*#/.test(line)) return span("text-slate-500 italic", line);
-          const m = line.match(/^([A-Za-z0-9_.\-~\[\]"]*?)(\s*[:=]\s*)(.*)$/);
-          if (!m) return line;
-          const [, key, op, val] = m;
-          const v = val.replace(/("[^"]*"|'[^']*')/g, (q) => span("text-emerald-300", q));
-          return `${span("text-cyan-300", key)}${span("text-fg-dim", op)}${v}`;
-        })
-        .join("\n");
-    }
-    if (lang === "json") {
-      let out = src.replace(/"([^"]*)"(\s*:)/g, (_, k, col) => `\u0001${k}\u0002${col}`);
-      out = out.replace(/"[^"]*"/g, (m) => span("text-emerald-300", m));
-      out = out.replace(/\b(true|false|null)\b/g, (m) => span("text-amber-300", m));
-      out = out.replace(/[\u0001]([^\u0002]*)[\u0002]/g, (_, k) => span("text-violet-300", `"${k}"`));
-      return out;
-    }
-    if (lang === "xml/html") {
-      return src
-        .replace(/(&lt;!--.*?--&gt;)/g, (m) => span("text-slate-500 italic", m))
-        .replace(/(<\/?)([A-Za-z0-9-]+)/g, (_, lt, t) => `${lt}${span("text-fuchsia-300", t)}`)
-        .replace(/([A-Za-z-]+)=("[^"]*"|'[^']*')/g, (_, a, v) => `${span("text-cyan-300", a)}=${span("text-emerald-300", v)}`)
-        .replace(/("[^"]*"|'[^']*')/g, (m) => span("text-emerald-300", m));
-    }
-    if (lang === "code") {
-      const chunkRe = /((?:\/\/.*?$)|(?:#.*?$))|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`)|(\b\d+(?:\.\d+)?[a-zA-Z]*\b)|(\b(?:const|let|var|function|return|if|else|elif|for|while|do|class|new|this|super|public|private|protected|static|final|void|int|boolean|long|double|float|short|byte|char|String|List|Map|Set|Object|Boolean|Integer|import|export|from|extends|implements|throw|try|catch|finally|break|continue|def|None|True|False|and|or|not|in|is|lambda|async|await|with|as|fn|let|mut|impl|trait|struct|enum|pub|use|mod|self|Self|move|package|type|interface|select|defer|go|range|map|chan|then|fi|case|esac|done|echo|printf|declare|global|match)\b)|([A-Za-z_$][\w$]*)(?=\s*\()/gm;
-      const parts: string[] = [];
-      let last = 0;
-      let m: RegExpExecArray | null;
-      chunkRe.lastIndex = 0;
-      while ((m = chunkRe.exec(src)) !== null) {
-        parts.push(src.slice(last, m.index));
-        const com = m[1], str = m[2], num = m[3], kw = m[4], fn = m[5];
-        if (com) parts.push(span("text-slate-500 italic", com));
-        else if (str) parts.push(span("text-emerald-300", str));
-        else if (num) parts.push(span("text-amber-300", num));
-        else if (kw) parts.push(span("text-fuchsia-300", kw));
-        else if (fn) parts.push(span("text-blue-300", fn));
-        last = chunkRe.lastIndex;
-      }
-      parts.push(src.slice(last));
-      return parts.join("");
-    }
-    if (lang === "sql") {
-      let out = src.replace(/^(\s*--.*)$/gm, (_, c) => span("text-slate-500 italic", c));
-      out = out.replace(/\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|INTO|VALUES|SET|JOIN|ON|AS|GROUP|BY|ORDER|LIMIT|CREATE|TABLE|INDEX|DROP|ALTER|AND|OR|NOT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|UNION|CASE|WHEN|THEN|END|COUNT|SUM|AVG|MIN|MAX|IN|EXISTS|DISTINCT|LEFT|RIGHT|INNER|OUTER)\b/gi, (m) => span("text-fuchsia-300", m));
-      out = out.replace(/("[^"]*"|'[^']*')/g, (m) => span("text-emerald-300", m));
-      return out;
-    }
-    if (lang === "md") {
-      let out = src.replace(/^(#+)\s+(.*)$/gm, (_, h, t) => span("text-sky-300 font-bold", `${h} ${t}`));
-      out = out.replace(/`([^`]+)`/g, (_, c) => span("text-emerald-300", `\u0001${c}\u0002`));
-      out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => `${span("text-blue-300", t)}(${span("text-fg-dim", u)})`);
-      out = out.replace(/\*\*([^*]+)\*\*/g, (_, t) => span("text-amber-300 font-bold", t));
-      out = out.replace(/\*([^*]+)\*/g, (_, t) => span("text-amber-300 italic", t));
-      out = out.replace(/\u0001([^\u0002]*)\u0002/g, (_, t) => span("text-emerald-300", t));
-      return out;
-    }
-    return src;
-  }
-
-  const highlighted = $derived(editor ? hl(editorDraft, langFor(editor.name)) : "");
-  const editorLines = $derived(editor ? Math.max(editorDraft.split("\n").length, editor.content.split("\n").length) : 0);
-  const changedLines = $derived(editor ? (() => {
-    const a = editor.content.split("\n");
-    const b = editorDraft.split("\n");
-    const set = new Set<number>();
-    const max = Math.max(a.length, b.length);
-    for (let i = 0; i < max; i++) if (a[i] !== b[i]) set.add(i);
-    return set;
-  })() : new Set<number>());
-  const lineNums = $derived(Array.from({ length: editorLines }, (_, i) => i + 1));
-
-  function syncScroll() {
-    if (!taRef) return;
-    if (preRef) {
-      preRef.scrollTop = taRef.scrollTop;
-      preRef.scrollLeft = taRef.scrollLeft;
-    }
-    if (gutterRef) gutterRef.scrollTop = taRef.scrollTop;
-  }
-
-  function onKeyEditor(e: KeyboardEvent) {
-    if (e.key === "Escape") editor = null;
-    if (e.ctrlKey || e.metaKey) {
-      const code = e.code;
-      if (code === "KeyS") {
-        e.preventDefault();
-        saveEditor();
-      } else if (code === "KeyZ") {
-        e.preventDefault();
-        if (e.shiftKey) redoEditor();
-        else undoEditor();
-      } else if (code === "KeyY") {
-        e.preventDefault();
-        redoEditor();
-      }
-    }
-    e.stopPropagation();
-  }
-
-  // ---- editor undo/redo (WebKit textareas don't reliably keep undo history
-  // when the value is re-bound on every keystroke) ----------------------------
-
-  let undoStack: string[] = $state([]);
-  let redoStack: string[] = $state([]);
-
-  function captureUndo() {
-    if (!editor) return;
-    if (undoStack[undoStack.length - 1] === editorDraft) return;
-    undoStack.push(editorDraft);
-    if (undoStack.length > 200) undoStack.shift();
-    redoStack = [];
-  }
-
-  function undoEditor() {
-    if (!editor || undoStack.length === 0) return;
-    redoStack.push(editorDraft);
-    editorDraft = undoStack.pop()!;
-  }
-
-  function redoEditor() {
-    if (!editor || redoStack.length === 0) return;
-    undoStack.push(editorDraft);
-    editorDraft = redoStack.pop()!;
-  }
 
   // ---- drag & drop ---------------------------------------------------------
 
@@ -698,49 +528,15 @@
 
 {#if editor}
   <Dialog title={t("Edit: {name}", { name: editor.name })} open={true} onClose={() => (editor = null)} wide>
-    <div class="flex flex-col gap-2">
-      <div class="flex border border-edge rounded-lg overflow-hidden bg-surface-0" style="min-height: 320px;">
-        <div
-          bind:this={gutterRef}
-          class="shrink-0 w-12 text-right px-2 py-3 overflow-hidden select-none text-[12px] text-fg-dim font-mono text-slate-500"
-          style="line-height: {LINE_H};"
-        >
-          {#each lineNums as ln (ln)}
-            <div class="flex items-center gap-1 justify-end">
-              <span class="shrink-0 text-slate-600">{ln}</span>
-              <span class="w-px h-full shrink-0 {changedLines.has(ln - 1) ? 'bg-amber-400' : 'bg-transparent'}"></span>
-            </div>
-          {/each}
-        </div>
-        <div class="relative flex-1 min-w-0">
-          <pre
-            bind:this={preRef}
-            class="m-0 px-3 py-3 font-mono text-[13px] text-slate-100 overflow-hidden pointer-events-none whitespace-pre"
-            style="line-height: {LINE_H};"
-          >{@html highlighted}</pre>
-          <textarea
-            bind:this={taRef}
-            bind:value={editorDraft}
-            onbeforeinput={captureUndo}
-            oninput={syncScroll}
-            onscroll={syncScroll}
-            onkeydown={onKeyEditor}
-            spellcheck="false"
-            autocomplete="off"
-            class="absolute inset-0 w-full h-full resize-none bg-transparent text-transparent caret-slate-100 outline-none font-mono text-[13px] whitespace-pre"
-            style="line-height: {LINE_H}; padding: 0.75rem 0.75rem;"
-          ></textarea>
-        </div>
-      </div>
-      <div class="flex items-center justify-end gap-2">
-        <span class="flex-1 text-xs text-fg-dim">
-          {t("editor status", { path: editor.path, n: editorDraft.split("\n").length, m: changedLines.size })}
-        </span>
-        <span class="text-[11px] text-fg-dim hidden md:block">{t("Ctrl+S to save · Esc to close")}</span>
-        <Button variant="outline" size="sm" onclick={() => (editor = null)}>{t("Cancel")}</Button>
-        <Button size="sm" onclick={saveEditor}>{t("Save")}</Button>
-      </div>
-    </div>
+    {#await import("../../lib/ui/CodeEditor.svelte") then { default: CodeEditor }}
+      <CodeEditor
+        path={editor.path}
+        name={editor.name}
+        content={editor.content}
+        onSave={saveEditor}
+        onClose={() => (editor = null)}
+      />
+    {/await}
   </Dialog>
 {/if}
 
