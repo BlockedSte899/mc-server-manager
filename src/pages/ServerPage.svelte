@@ -126,7 +126,7 @@
 </script>
 
 {#if id && meta}
-  <div class="max-w-7xl mx-auto px-5 py-6 flex flex-col" style="height: calc(100vh - 56px);">
+  <div class="px-5 py-6 flex flex-col" style="height: calc(100vh - 56px);">
     <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
       <div class="flex items-center gap-3 min-w-0">
         <Button
@@ -236,7 +236,7 @@
     onClose={() => (confirmDelete = false)}
   />
 {:else if id}
-  <div class="max-w-7xl mx-auto px-5 py-12 text-center text-fg-dim text-sm">
+  <div class="px-5 py-12 text-center text-fg-dim text-sm">
     {t("Server not found.")}
     <button class="text-brand-500 underline cursor-pointer" onclick={() => navigate("/")}>{t("Go back")}</button>
   </div>

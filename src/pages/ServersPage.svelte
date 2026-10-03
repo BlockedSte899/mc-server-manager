@@ -16,7 +16,7 @@
   });
 </script>
 
-<div class="max-w-7xl mx-auto px-5 py-6">
+<div class="px-5 py-6">
   <div class="flex items-center justify-between mb-5">
     <div>
       <h1 class="text-xl font-bold text-slate-50">{t("Servers")}</h1>
@@ -35,7 +35,7 @@
   </div>
 
   {#if servers.length > 0}
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
       {#each servers as srv (srv.meta.id)}
         <ServerCard server={srv} />
       {/each}

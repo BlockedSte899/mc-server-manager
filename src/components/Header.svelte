@@ -34,7 +34,7 @@
 
 <header class="sticky top-0 z-40 border-b border-edge bg-surface-0">
   <div
-    class="max-w-7xl mx-auto px-5 h-14 flex items-center gap-6"
+    class="px-5 h-14 flex items-center gap-6"
     data-tauri-drag-region
   >
     <a
