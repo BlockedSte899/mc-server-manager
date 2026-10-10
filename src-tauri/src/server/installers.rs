@@ -90,6 +90,10 @@ pub async fn install_fabric(
         .arg(mc)
         .arg("-loader")
         .arg(loader)
+        // Without this flag the installer does not fetch the official
+        // Minecraft server jar and the fabric-server-launch.jar fails at boot
+        // with "Missing game jar ... server.jar".
+        .arg("-downloadMinecraft")
         .arg("-dir")
         .arg(server_dir)
         .stdout(std::process::Stdio::null())

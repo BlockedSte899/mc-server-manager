@@ -75,12 +75,15 @@
     try {
       const v = await versionsApi.coreVersions(core, snapshotsSupported() && includeSnapshots);
       versions = v;
-      mcVersion = v[0] ?? "";
+      // Keep the picked version when the new core supports it too — picking
+      // "1.21.4" first and then switching the core must not lose the choice.
+      if (!v.includes(mcVersion)) mcVersion = v[0] ?? "";
     } catch (e) {
       toast(String(e), "error");
     } finally {
       loadingVersions = false;
     }
+    if (needsLoader()) await loadLoaders();
   }
 
   async function loadLoaders() {
