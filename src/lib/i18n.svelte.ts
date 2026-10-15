@@ -360,6 +360,7 @@ const ru: Dict = {
   "Toggle preview": "Показать/скрыть превью",
   "Loading preview…": "Загрузка превью…",
   "No screenshots available.": "Скриншоты недоступны.",
+  "Open folder in file manager": "Открыть папку в проводнике",
   "Server \"{name}\" created": "Сервер «{name}» создан",
   "Failed to create: {e}": "Не удалось создать: {e}",
 

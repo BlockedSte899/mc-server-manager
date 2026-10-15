@@ -1618,6 +1618,25 @@ async fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.shell().open(&url, None).map_err(|e| e.to_string())
 }
 
+/// Opens a server's folder in the system file manager (xdg-open et al.).
+#[tauri::command]
+async fn open_server_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    use tauri_plugin_shell::ShellExt;
+    let settings = state.settings.lock().await;
+    let dir = settings.server_folder(&id);
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    drop(settings);
+    app.shell()
+        .open(dir.to_string_lossy().as_ref(), None)
+        .map_err(|e| format!("failed to open {}: {e}", dir.display()))
+}
+
 /// Display/DPI diagnostics for the frontend: the GTK scale factor plus logical
 /// and physical window sizes.
 ///
@@ -1871,6 +1890,7 @@ pub fn run() {
             velocity_generate_secret,
             velocity_candidates,
             open_url,
+            open_server_folder,
             ui_metrics,
             ui_log,
         ])

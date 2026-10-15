@@ -224,7 +224,9 @@
       bind:value={core}
       options={coreOptions}
       onChange={(v) => {
-        if (v === core) return;
+        // NOTE: the bind already updated `core` before onChange fires, so a
+        // `v === core` early-return here would ALWAYS trigger and skip the
+        // reload — the version list must refresh on every core change.
         core = v;
         customVersionOpen = false;
         loadVersions();

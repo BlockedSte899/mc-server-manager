@@ -14,6 +14,7 @@
   import { isTauri } from "../../lib/env";
   import {
     Folder,
+    FolderOpen,
     FileText,
     ArrowUp,
     RefreshCw,
@@ -355,6 +356,20 @@
         {pl(entries.length, ["{n} элемент", "{n} элемента", "{n} элементов"], "{n} item(s)")}
       {/if}
     </span>
+    <Button
+      variant="outline"
+      size="sm"
+      onclick={async () => {
+        try {
+          await filesApi.openFolder(id);
+        } catch (e) {
+          toast(String(e), "error");
+        }
+      }}
+      title={t("Open folder in file manager")}
+    >
+      <FolderOpen size={14} />
+    </Button>
     <Button variant="outline" size="sm" onclick={refresh} title={t("Refresh")} disabled={loading}>
       <RefreshCw size={14} class={loading ? "animate-spin" : ""} />
     </Button>

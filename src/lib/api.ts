@@ -169,6 +169,7 @@ export const filesApi = {
     call<string>("files_zip", { id, sources, baseDir, name }),
   unzip: (id: string, path: string, destDir: string) =>
     call<void>("files_unzip", { id, path, destDir }),
+  openFolder: (id: string) => call<void>("open_server_folder", { id }),
 };
 
 export const exportApi = {
