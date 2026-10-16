@@ -113,12 +113,6 @@ jobs:
 
       - uses: cachix/install-nix-action@v27
 
-      # Speeds up this job only — the GitHub Actions cache is not public.
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-        with:
-          cache-key: mcsm-${{ github.ref_name }}
-          never-skip-cache-verification: true
-
       - name: Build the flake package
         run: nix build .#default
 
@@ -146,11 +140,6 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v4
 
       - uses: cachix/install-nix-action@v27
-
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-        with:
-          cache-key: mcsm-${{ github.ref_name }}
-          never-skip-cache-verification: true
 
       # Rebuild in this fresh runner so the store holds the derivations to push
       # (jobs don't share a store, so the `nix` job's build is not visible here).
