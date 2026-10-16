@@ -20,7 +20,24 @@ tray.
 
 ## Installation
 
-### NixOS (flake)
+### NixOS — AppImage (zero setup)
+
+The release ships a self-contained AppImage (all libraries bundled, ~80 MB). No
+Cachix subscription, no compilation:
+
+```bash
+curl -LO "https://github.com/BlockedSte899/mc-server-manager/releases/latest/download/mc-server-manager_amd64.AppImage"
+chmod +x mc-server-manager_amd64.AppImage
+./mc-server-manager_amd64.AppImage
+```
+
+- If FUSE is unavailable, run `./mc-server-manager_amd64.AppImage --appimage-extract-and-run`.
+- Prefer nix to fetch it for you? `nix run nixpkgs#appimage-run -- ./mc-server-manager_amd64.AppImage`
+
+The trade-off: no desktop-entry integration — launch it from a terminal or wire
+your own `.desktop` file. For full integration use the flake below.
+
+### NixOS — flake (desktop entry, tray, system install)
 
 The flake exposes `packages.<system>.default`, so the app can be installed system-wide or
 per-user straight from your configuration.
@@ -34,7 +51,7 @@ Add it as an input — in your `flake.nix`:
     mc-server-manager = {
       url = "github:BlockedSte899/mc-server-manager";
       # pin to a release tag once you have one:
-      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v1.1.4";
+      # inputs.mc-server-manager.url = "github:BlockedSte899/mc-server-manager/v1.1.5";
     };
   };
 
@@ -70,6 +87,23 @@ To try it without adding it to your configuration:
 ```bash
 nix run github:BlockedSte899/mc-server-manager
 ```
+
+#### Prebuilt binaries via Cachix
+
+Without any extra configuration Nix downloads all *dependencies* from
+`cache.nixos.org` (they are regular nixpkgs packages) and compiles only the app
+itself (~5–10 minutes). To skip that compile too, point Nix at the project's
+binary cache:
+
+```nix
+nix.settings.substituters = [ "https://mc-server-manager.cachix.org" ];
+nix.settings.trusted-public-keys = [ "mc-server-manager.cachix.org-1:<PUBLIC_KEY>" ];
+```
+
+The exact public key is shown at <https://app.cachix.org/cache/mc-server-manager>
+(or run `nix run nixpkgs#cachix -- use mc-server-manager` once, which writes the
+configuration for you). No authentication is needed to download — the Cachix
+token only authorizes CI to publish new builds.
 
 #### With Home Manager
 
@@ -138,13 +172,13 @@ nix build github:BlockedSte899/mc-server-manager
 CI publishes every build to that cache, so once a release has been through CI the
 package is fetched instead of compiled.
 
-### AppImage
+### AppImage (other Linux)
 
 Grab the `.AppImage` from [Releases](https://github.com/BlockedSte899/mc-server-manager/releases):
 
 ```bash
-chmod +x MC_Server_Manager_1.1.4_amd64.AppImage
-./MC_Server_Manager_1.1.4_amd64.AppImage
+chmod +x mc-server-manager_1.1.5_amd64.AppImage
+./mc-server-manager_1.1.5_amd64.AppImage
 ```
 
 The AppImage bundles its own libraries, so it runs on Ubuntu, Fedora, Arch and friends
@@ -152,22 +186,22 @@ without installing dependencies. Some distributions (Fedora, some Arch setups) r
 
 ```bash
 sudo apt install libfuse2      # Debian / Ubuntu
-./MC_Server_Manager_1.1.4_amd64.AppImage --appimage-extract-and-run   # no FUSE
+./MC_Server_Manager_1.1.5_amd64.AppImage --appimage-extract-and-run   # no FUSE
 ```
 
 ### .deb / .rpm
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./mc-server-manager_1.1.4_amd64.deb
+sudo apt install ./mc-server-manager_1.1.5_amd64.deb
 
 # Fedora / openSUSE
-sudo dnf install ./mc-server-manager-1.1.4-1.x86_64.rpm
+sudo dnf install ./mc-server-manager-1.1.5-1.x86_64.rpm
 ```
 
 ### Windows
 
-Download the NSIS installer (`MC Server Manager_1.1.4_x64-setup.exe`) from
+Download the NSIS installer (`MC Server Manager_1.1.5_x64-setup.exe`) from
 [Releases](https://github.com/BlockedSte899/mc-server-manager/releases). It installs per
 user, needs no separate runtime, and ships English and Russian. An MSI is provided too.
 
@@ -209,8 +243,8 @@ Release binaries are produced by [`.github/workflows/build.yml`](.github/workflo
 on tag pushes and are published to GitHub Releases automatically:
 
 ```bash
-git tag v1.1.4
-git push origin v1.1.4
+git tag v1.1.5
+git push origin v1.1.5
 ```
 
 ## License

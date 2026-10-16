@@ -45,6 +45,19 @@ jobs:
       - name: Build bundles
         run: pnpm tauri build --bundles appimage deb rpm
 
+      # Release assets shouldn't contain spaces ("MC Server Manager_1.1.5_amd64.AppImage")
+      # — lowercase-with-dashes is friendlier for curl/wget.
+      - name: Normalize bundle file names
+        run: |
+          cd target/release/bundle/appimage
+          for f in *.AppImage; do
+            lower="$(echo "${f%.AppImage}" | tr 'A-Z' 'a-z' | tr ' ' '-').AppImage"
+            [ "$f" != "$lower" ] && mv "$f" "$lower" || true
+          done
+          # Stable name for curl'ing `releases/latest/download/...`
+          cp -f mc-server-manager_*_amd64.AppImage mc-server-manager_amd64.AppImage
+          ls -la
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundles-linux
@@ -163,12 +176,26 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # NOTE: artifacts land in subdirectories (upload-artifact@v4 keeps paths
+      # relative to their common ancestor), so the glob must be recursive — a
+      # single-level `artifacts/*` used to produce an empty release.
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*
+          files: artifacts/**/*
+          fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
-            ## NixOS
+            ## NixOS — AppImage (zero setup)
+
+            ```bash
+            curl -LO "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mc-server-manager_${{ github.ref_name }}_amd64.AppImage"
+            chmod +x "mc-server-manager_${{ github.ref_name }}_amd64.AppImage"
+            ./mc-server-manager_${{ github.ref_name }}_amd64.AppImage
+            ```
+
+            If FUSE is unavailable, run it with `--appimage-extract-and-run`.
+
+            ## NixOS — flake (desktop entry, tray, nix profile)
 
             ```nix
             inputs.mc-server-manager.url = "github:${{ github.repository }}/${{ github.ref_name }}";
@@ -180,3 +207,17 @@ jobs:
             ```bash
             nix run github:${{ github.repository }}/${{ github.ref_name }}
             ```
+
+            Prebuilt binaries are published to Cachix. Without configuring it,
+            Nix compiles the app itself (dependencies always come from
+            cache.nixos.org). To download prebuilt instead:
+
+            ```nix
+            nix.settings.substituters = [ "https://mc-server-manager.cachix.org" ];
+            nix.settings.trusted-public-keys = [ "mc-server-manager.cachix.org-1:<PUBLIC_KEY from https://app.cachix.org/cache/mc-server-manager>" ];
+            ```
+
+            ## Windows
+
+            Grab the NSIS `…_x64-setup.exe` installer or the `.msi` from the
+            assets below.
