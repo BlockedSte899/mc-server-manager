@@ -141,12 +141,11 @@ jobs:
 
       - uses: cachix/install-nix-action@v27
 
-      # Rebuild in this fresh runner so the store holds the derivations to push
-      # (jobs don't share a store, so the `nix` job's build is not visible here).
-      - name: Build the flake package
-        run: nix build .#default
-
-      - name: Push to Cachix
+      # The action has TWO phases: main (records the store listing BEFORE the
+      # build and sets up the substituter) and post (pushes the DELTA after
+      # the build). It must therefore run BEFORE `nix build` — placed after it
+      # the delta is empty and nothing is ever pushed.
+      - name: Set up Cachix
         if: ${{ env.CACHIX_AUTH_TOKEN != '' }}
         uses: cachix/cachix-action@v16
         with:
@@ -156,12 +155,17 @@ jobs:
           # it the push is silently skipped.
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           # The default daemon mode registers its post-build-hook in the USER
-          # nix config, but the builds run through the system nix-daemon, so
-          # the hook never fires and nothing is pushed (0 B stored). StoreScan
+          # nix config, but the builds run through the multi-user nix-daemon,
+          # whose builds never trigger a user-config hook — the daemon
+          # received nothing and the step still reported success. StoreScan
           # (the delta of the store listing after the build) is deterministic.
           useDaemon: false
           skipPush: false
-          extraPushFlags: "--verbose"
+
+      # Rebuild in this fresh runner so the store holds the derivations to push
+      # (jobs don't share a store, so the `nix` job's build is not visible here).
+      - name: Build the flake package
+        run: nix build .#default
 
   publish:
     name: Publish GitHub Release
