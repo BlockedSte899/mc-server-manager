@@ -155,6 +155,11 @@ jobs:
           # var CACHIX_AUTH_TOKEN is used by the `if:` guard above); without
           # it the push is silently skipped.
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          # The default daemon mode registers its post-build-hook in the USER
+          # nix config, but the builds run through the system nix-daemon, so
+          # the hook never fires and nothing is pushed (0 B stored). StoreScan
+          # (the delta of the store listing after the build) is deterministic.
+          useDaemon: false
           skipPush: false
           extraPushFlags: "--verbose"
 
