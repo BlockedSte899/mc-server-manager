@@ -97,7 +97,7 @@ binary cache:
 
 ```nix
 nix.settings.substituters = [ "https://mc-server-manager.cachix.org" ];
-nix.settings.trusted-public-keys = [ "mc-server-manager.cachix.org-1:<PUBLIC_KEY>" ];
+nix.settings.trusted-public-keys = [ "mc-server-manager.cachix.org-1:Hsl2QiUTpR2soBiVT3OMX+whjLoGkMooh05O0dGMbiI=" ];
 ```
 
 The exact public key is shown at <https://app.cachix.org/cache/mc-server-manager>
