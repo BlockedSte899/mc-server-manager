@@ -5,6 +5,8 @@ Desktop application for managing Minecraft servers, built with **Tauri v2**, **S
 schedules restarts and backups, streams the console, and can stay resident in the system
 tray.
 
+https://github.com/user-attachments/assets/0d7bf8e1-1959-477e-b0c5-97e9bdf6a281
+
 ## Features
 
 - Multiple Minecraft (and Velocity) servers, each with its own settings
