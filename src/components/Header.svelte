@@ -1,7 +1,8 @@
 <script lang="ts">
   import { navigate, getPath } from "../lib/router.svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { Server, Settings, DownloadCloud, Boxes, Minus, Square, X, Copy } from "lucide-svelte";
+  import logoUrl from "../assets/logo.svg";
+  import { Server, Settings, DownloadCloud, Minus, Square, X, Copy } from "lucide-svelte";
   import { t } from "../lib/i18n.svelte";
   import { onMount } from "svelte";
 
@@ -45,12 +46,7 @@
         navigate("/");
       }}
     >
-      <div
-        class="w-8 h-8 rounded-lg bg-brand-500 border border-brand-400 flex items-center justify-center shadow-[0_0_12px_rgba(72,255,160,0.35)]"
-        title={t("MC Server Manager logo")}
-      >
-        <Boxes size={18} class="text-white" />
-      </div>
+      <img src={logoUrl} alt="" class="w-8 h-8 rounded-lg shadow-[0_0_12px_rgba(72,255,160,0.35)]" />
       <span class="font-bold tracking-tight text-slate-100">MC Server Manager</span>
     </a>
 

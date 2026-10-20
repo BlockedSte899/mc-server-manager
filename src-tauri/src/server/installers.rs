@@ -119,15 +119,20 @@ pub async fn install_quilt(
 ) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new(java);
     crate::utils::console::hide_console(&mut cmd);
+    // Quilt installer CLI (0.13+): the loader version is a POSITIONAL
+    // argument and --install-dir takes an `=`-joined value; `--loader` /
+    // separate `--install-dir` are rejected with a help text and EXIT CODE 0,
+    // which used to look like a successful install with no files created.
     cmd.arg("-jar")
         .arg(installer)
         .arg("install")
         .arg("server")
         .arg(mc)
-        .arg("--loader")
         .arg(loader)
-        .arg("--install-dir")
-        .arg(server_dir)
+        .arg(format!("--install-dir={}", server_dir.display()))
+        // Same as Fabric's -downloadMinecraft: without the official server.jar
+        // the launch jar cannot start the server.
+        .arg("--download-server")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     let status = tokio::time::timeout(std::time::Duration::from_secs(900), cmd.status())
@@ -138,5 +143,11 @@ pub async fn install_quilt(
         return Err(format!("quilt installer exited with {status}"));
     }
     let _ = std::fs::remove_file(installer);
+    let launch_jar = server_dir.join("quilt-server-launch.jar");
+    if !launch_jar.exists() {
+        return Err(
+            "quilt installer finished but did not create quilt-server-launch.jar".to_string(),
+        );
+    }
     Ok("quilt-server-launch.jar".to_string())
 }

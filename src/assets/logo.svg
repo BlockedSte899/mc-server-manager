@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="t">
+  <title id="t">MC Server Manager</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="256" y1="0" x2="256" y2="512">
+      <stop offset="0" stop-color="#35d98f"/>
+      <stop offset="1" stop-color="#17a873"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="128" fill="url(#bg)"/>
+  <path fill="#ffffff" fill-rule="evenodd" d="M256 36 L446.52 146 V366 L256 476 L65.48 366 V146 Z M105.48 229.1 L216 292.9 V324.9 L105.48 261.1 Z M105.48 297.1 L216 360.9 V392.9 L105.48 329.1 Z M294.1 262 L370.32 274 V326 L294.1 426 V374 L334.94 320.42 L294.1 314 Z"/>
+</svg>

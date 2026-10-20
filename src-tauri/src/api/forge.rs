@@ -58,9 +58,10 @@ pub async fn forge_minecraft_versions() -> Result<Vec<String>, String> {
     let versions = forge_metadata_versions().await?;
     let mut mcs = std::collections::BTreeSet::new();
     for v in versions {
-        // entries look like "1.21.1-52.1.16"
+        // entries look like "1.21.1-52.1.16" or "26.3-60.1.x" (year-based MC
+        // versioning) — everything before the first '-' is the MC version.
         if let Some((mc, _)) = v.split_once('-') {
-            if mc.starts_with("1.") {
+            if mc.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                 mcs.insert(mc.to_string());
             }
         }
@@ -124,14 +125,16 @@ pub async fn neoforge_minecraft_versions() -> Result<Vec<String>, String> {
     Ok(mcs.into_iter().rev().collect())
 }
 
-/// Converts "21.1.144" -> "1.21.1", "20.4.237" -> "1.20.4".
+/// Converts a NeoForge loader version to its Minecraft version:
+/// "21.1.144" -> "1.21.1" (classic scheme) and "26.1.x" -> "26.1" (Minecraft
+/// switched to year-based versions; NeoForge follows without the "1.").
 pub fn loader_to_mc(loader: &str) -> Option<String> {
     let parts: Vec<&str> = loader.split('.').collect();
     if parts.len() >= 2 {
         let major: u32 = parts[0].parse().ok()?;
         let minor: u32 = parts[1].parse().ok()?;
-        if major >= 8 {
-            Some(format!("1.{major}.{minor}"))
+        if major >= 26 {
+            Some(format!("{major}.{minor}"))
         } else {
             Some(format!("1.{major}.{minor}"))
         }

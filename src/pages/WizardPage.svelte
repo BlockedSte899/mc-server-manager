@@ -5,7 +5,7 @@
   import Switch from "../lib/ui/Switch.svelte";
   import Progress from "../lib/ui/Progress.svelte";
   import { serversApi, settingsApi, versionsApi } from "../lib/api";
-  import { settings, toast } from "../lib/store.svelte";
+  import { settings, toast, refreshServers } from "../lib/store.svelte";
   import { navigate } from "../lib/router.svelte";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -159,6 +159,10 @@
         accept_eula: acceptEula,
       });
       toast(t('Server "{name}" created', { name: meta.name }), "success");
+      // Make sure the servers list contains the new entry before navigating,
+      // otherwise ServerPage looks it up in a stale list and flashes
+      // "server not found".
+      await refreshServers();
       navigate(`/s/${meta.id}`);
     } catch (e) {
       toast(t("Failed to create: {e}", { e: String(e) }), "error");
